@@ -1,0 +1,38 @@
+"VMSA strong"
+include "cos.cat"
+include "barriers.cat"
+include "aarch64_mmu_common.cat"
+
+(* observed by *)
+let obs = rfe | fr | wco
+  (* observing a write through a fetch or translate
+   * means the write is now visible to the rest of the system
+   * aka {instruction, translation}->data coherence *)
+  | trfe
+
+(* dependency-ordered-before *)
+let dob =
+    addr | data
+  | speculative ; [W]
+  | addr; po; [W]
+  | (addr | data); rfi
+  | (addr | data); trfi
+
+(* atomic-ordered-before *)
+let aob = rmw
+  | [range(rmw)]; rfi; [A | Q]
+
+(* barrier-ordered-before *)
+let bob = [dmb]; po; [R | W]
+  | [L]; po; [A]
+  | [A | Q]; po; [R | W]
+  | [R | W]; po; [L]
+  | [R] ; po ; [dmbld]
+  | [W] ; po ; [dmbst]
+  | [R | W] ; po ; [dmbsy]
+  | [R | W | F | C]; po; [dsbsy]
+  | [dsb]; po; [R | W | F | C]
+
+(* Ordered-before *)
+let _ob = obs | dob | aob | bob | iio | tob | obtlbi | ctxob | obfault
+let ob = _ob^+

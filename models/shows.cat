@@ -1,0 +1,19 @@
+show iio
+show po
+
+show rf
+show fr
+show co
+
+show trf
+show tfr
+
+show addr
+show data
+show ctrl
+
+show same-va-page
+show same-ipa-page
+
+show same-asid
+show same-vmid

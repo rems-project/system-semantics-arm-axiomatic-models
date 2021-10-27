@@ -1,0 +1,41 @@
+"arm"
+include "cos.cat"
+include "barriers.cat"
+
+(* observed by *)
+let obs = rfe | fr | wco
+
+(* dependency-ordered-before *)
+let dob =
+    addr | data
+  | (ctrl | (addr ; po)) ; [W]
+  | (addr | data); rfi
+
+(* atomic-ordered-before *)
+let aob = rmw
+  | [range(rmw)]; rfi; [A | Q]
+
+(* barrier-ordered-before *)
+let bob = [R | W]; po; [DMBSY]
+  | [DMBSY]; po; [R | W]
+  | [L]; po; [A]
+  | [R]; po; [DMBLD]
+  | [DMBLD]; po; [R | W]
+  | [A | Q]; po; [R | W]
+  | [W]; po; [dmb.st]
+  | [dmb.st]; po; [W]
+  | [R | W]; po; [L]
+  | [R | W | F | C]; po; [DSBSY]
+  | [DSBSY]; po; [R | W | F | C]
+
+(* Ordered-before *)
+let ob = (obs | dob | aob | bob)^+
+
+(* Internal visibility requirement *)
+acyclic po-loc | fr | co | rf as internal
+
+(* External visibility requirement *)
+irreflexive ob as external
+
+(* Atomic: Basic LDXR/STXR constraint to forbid intervening writes. *)
+empty rmw & (fre; coe) as atomic

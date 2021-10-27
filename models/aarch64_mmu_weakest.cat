@@ -1,0 +1,40 @@
+"VMSA weakest"
+include "cos.cat"
+include "barriers.cat"
+include "aarch64_mmu_common.cat"
+
+let obs = rfe | fr | wco
+
+let dob = addr | data
+  | ctrl; [W]
+  | (ctrl | (addr; po)); [ISB]
+  | addr; po; [W]
+  | (addr | data); rfi
+
+let aob = rmw
+  | [range(rmw)]; rfi; [A | Q]
+
+let bob = [R | W]; po; [DMB.SY]
+  | [DMB.SY]; po; [R | W]
+  | [L]; po; [A]
+  | [R]; po; [DMB.LD]
+  | [DMB.LD]; po; [R | W]
+  | [A | Q]; po; [R | W]
+  | [W]; po; [DMB.ST]
+  | [DMB.ST]; po; [W]
+  | [R | W]; po; [L]
+  | [R | W | F | C]; po; [dsbsy]
+  | [dsb]; po; [R | W | F | C]
+  | [DMB.SY]; po; [DC]
+
+(* Ordered-before *)
+let ob = (obs | dob | aob | bob)^+
+
+(* Internal visibility requirement *)
+acyclic po-loc | fr | co | rf as internal
+
+(* External visibility requirement *)
+irreflexive ob as external
+
+(* Atomic: Basic LDXR/STXR constraint to forbid intervening writes. *)
+empty rmw & (fre; coe) as atomic
