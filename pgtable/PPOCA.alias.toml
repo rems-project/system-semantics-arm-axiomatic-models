@@ -1,0 +1,49 @@
+arch = "AArch64"
+name = "PPOCA.alias"
+symbolic = ["w", "x", "y", "z"]
+
+page_table_setup = """
+    physical pa1 pa2 pa3;
+    w |-> pa1;
+    x |-> pa1;
+    y |-> pa2;
+    z |-> pa3;
+    *pa1 = 0;
+    *pa2 = 0;
+    *pa3 = 0;
+"""
+
+[thread.0]
+code = """
+    STR X0,[X1]
+    DMB SY
+    STR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0x1, 64)"
+R1 = "z"
+R2 = "extz(0x1, 64)"
+R3 = "y"
+
+[thread.1]
+code = """
+    LDR X0,[X1]
+    CBNZ X0,L0
+L0:
+    STR X2,[X3]
+    LDR X4,[X5]
+    EOR X8,X4,X4
+    LDR X6,[X7,X8]
+"""
+
+[thread.1.reset]
+R1 = "y"
+R2 = "extz(0x1, 64)"
+R3 = "x"
+R5 = "w"
+R7 = "z"
+
+[final]
+expect = "sat"
+assertion = "1:X0 = 1 & 1:X4 = 1 & 1:X6 = 0"

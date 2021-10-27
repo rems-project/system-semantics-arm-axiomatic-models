@@ -1,0 +1,85 @@
+arch = "AArch64"
+name = "MP.RT.EL1+dsb-shootdown-dsb+dsb-isb"
+symbolic = ["x", "y", "z", "f"]
+
+page_table_setup = """
+    physical pa1 pa2 pa3;
+    x |-> pa1;
+    x ?-> invalid;
+
+    y |-> pa2;
+    *pa2 = 0;
+
+    f |-> pa3;
+    *pa3 = 0;
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    DSB SY
+    STR X4,[X5]
+    LDR X6,[X5]
+    DSB SY
+    STR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b0, 64)"
+R1 = "pte3(x, page_table_base)"
+R2 = "extz(0b1, 64)"
+R3 = "y"
+R4 = "extz(0b1, 64)"
+R5 = "f"
+
+"PSTATE.EL" = "0b01"
+
+[thread.1]
+init = {}
+code = """
+    LDR X4,[X5]
+    SVC #0
+    STR X7,[X5]
+    LDR X0,[X1]
+    DSB SY
+    ISB
+    LDR X2,[X3]
+"""
+
+[thread.1.reset]
+R1 = "y"
+R3 = "x"
+VBAR_EL1 = "extz(0x1000, 64)"
+R5 = "f"
+R6 = "extz(page(x), 64)"
+R7 = "extz(0b10, 64)"
+
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[section.thread1_el1_handler]
+address = "0x1400"
+code = """
+    MRS X9,ESR_EL1
+    LSR X9,X9,#26
+    SUB X9,X9,#0b010101
+    CBNZ X9,1f
+0:
+    DSB SY
+    TLBI VAE1,X6
+    DSB SY
+    ISB
+    ERET
+1:
+    MOV X2,#1
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+assertion = "1:X4 = 1 & 0:X6 = 2 & 1:X0 = 1 & 1:X2=0"

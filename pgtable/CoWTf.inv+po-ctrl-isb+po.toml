@@ -1,0 +1,78 @@
+arch = "AArch64"
+name = "CoWTf.inv+po-ctrl-isb+po"
+symbolic = ["x", "y", "u"]
+
+page_table_setup = """
+    physical pa1 pa2;
+    x |-> invalid;
+    x ?-> pa1;
+    u |-> pa1;
+    *pa1 = 1;
+
+    y |-> pa2;
+    *pa2 = 0;
+
+    identity 0x1000 with code;
+    identity 0x2000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    LDR X2,[X3]
+    CBNZ X2,L0
+L0:
+    ISB
+    LDR X4,[X5]
+"""
+
+[thread.0.reset]
+R0 = "desc3(u, page_table_base)"
+R1 = "pte3(x, page_table_base)"
+R3 = "y"
+R5 = "x"
+VBAR_EL1 = "extz(0x1000, 64)"
+"PSTATE.EL" = "0b00"
+"PSTATE.SP" = "0b0"
+
+[section.thread0_el1_handler]
+address = "0x1400"
+code = """
+    MOV X4,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    STR X2,[X3]
+"""
+
+[thread.1.reset]
+R1 = "x"
+R2 = "extz(0b1, 64)"
+R3 = "y"
+VBAR_EL1 = "extz(0x2000, 64)"
+"PSTATE.EL" = "0b00"
+"PSTATE.SP" = "0b0"
+
+[section.thread1_el1_handler]
+address = "0x2400"
+code = """
+    MOV X0,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+expect = "sat"
+assertion = "0:R2 = 1 & 0:X4=0 & 1:X0 = 1"

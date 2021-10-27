@@ -1,0 +1,129 @@
+arch = "AArch64"
+name = "pKVM.vcpu_run.update_vmid.concurrent"
+symbolic = ["x", "kvm_vmid_lock", "ipi"]
+
+page_table_setup = """
+option default_tables = false;
+physical pa1 pa2 pa_ipi pa_kvm_vmid_lock;
+intermediate ipa1 ipa2;
+
+s1table hyp_map 0x200000  {
+    identity 0x1000 with code;
+    x |-> invalid;
+    ipi |-> pa_ipi;
+    kvm_vmid_lock |-> pa_kvm_vmid_lock;
+}
+
+s2table vm1_stage2 0x300000  {
+    ipa1 |-> pa1;
+    ipa1 ?-> invalid;
+    ipa2 |-> invalid;
+    ipa2 ?-> pa2;
+
+    s1table vm1_stage1 0x280000 {
+        x |-> ipa1;
+    }
+}
+
+s2table vm2_stage2 0x380000  {
+    ipa1 |-> invalid;
+    ipa1 ?-> pa1;
+    ipa2 |-> pa2;
+    ipa2 ?-> invalid;
+
+    s1table vm2_stage1 0x2C0000 {
+        x |-> ipa2;
+    }
+}
+
+*pa2 = 1;
+*pa_kvm_vmid_lock = 1;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X2,[X3] // kvm/arm.c:551 force_vm_exit(cpu_all_mask);
+    LDR X4,[X5] // kvm/arm.c:551 force_vm_exit(cpu_all_mask);
+    // TODO: isn't something needed here?
+    // the load-acquire from the csd lock on the smp broadcast
+    // isn't enough presumably? or maybe it is?
+    DSB ISHST // kvm/hyp/nvhe/tlb.c:145
+    TLBI ALLE1IS // kvm/hyp/nvhe/tlb.c:146
+    DSB SY // kvm/hyp/nvhe/tlb.c:160
+
+    STR X6,[X7] // kvm/arm.c:567 spin_unlock(&kvm_vmid_lock);
+"""
+
+[thread.0.reset]
+R0 = "extz(0b1, 64)"
+R1 = "kvm_vmid_lock"
+
+R2 = "extz(0b1, 64)"
+R3 = "ipi"
+R5 = "ipi"
+
+R6 = "extz(0b0, 64)"
+R7 = "kvm_vmid_lock"
+
+TTBR0_EL2 = "ttbr(asid=0x0000, base=hyp_map)"
+"PSTATE.EL" = "0b10"
+"PSTATE.SP" = "0b1"
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]  // in guest, read X
+    DSB SY
+    ISB
+    HVC #0       // fake IPI
+    LDR X2,[X3]  // try again
+"""
+
+[thread.1.reset]
+"R1" = "x"
+"R3" = "x"
+"R5" = "ipi"
+"R6" = "extz(0b10, 64)"
+"R7" = "ipi"
+"R9" = "kvm_vmid_lock"
+"R10" = "ttbr(asid=0x0000, base=vm2_stage1)"
+"R11" = "ttbr(vmid=0x0001, base=vm2_stage2)" # re-use VMID
+
+TTBR0_EL2 = "ttbr(asid=0x0000, base=hyp_map)"
+VTTBR_EL2 = "ttbr(vmid=0x0001, base=vm1_stage2)"
+TTBR0_EL1 = "ttbr(asid=0x0000, base=vm1_stage1)"
+
+"PSTATE.EL" = "0b01"
+VBAR_EL2 = "extz(0x1000, 64)"
+
+[section.thread1_el2_handler]
+address = "0x1400" # 0x400 - Lower Exception Level
+code = """
+    LDR X4,[X5] // smb recieve
+    STR X6,[X7] // smb reply
+
+    LDAR X8,[X9] // kvm/hyp/include/nvhe/spinlock.h
+
+    MSR TTBR0_EL1,X10  // kvm/hyp/sysreg-sr.h:96
+    MSR VTTBR_EL2,X11  // include/asm/kvm_mmu.h:276
+    ERET // kvm/hyp/nvhe/host.S
+"""
+
+[final]
+assertion = "0:X4 = 2 & 1:X0 = 0 & 1:X4 = 1 & 1:X8 = 0 & 1:X2 = 0"
+
+[graph]
+force_show_events = [
+    "T1:0:s1l3",
+    "T1:0:s2l3",
+    "T1:10:s1l3",
+    "T1:10:s2l3",
+]
+shows = [
+    "iio",
+    "po",
+    "rf",
+    "trf",
+    "same-vmid",
+]

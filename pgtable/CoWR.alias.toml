@@ -1,0 +1,37 @@
+arch = "AArch64"
+name = "CoWR.alias"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1;
+    x |-> pa1;
+    y |-> pa1;
+    *pa1 = 0;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    LDR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0x1, 64)"
+R1 = "x"
+R3 = "y"
+
+[final]
+expect = "sat"
+assertion = "0:X2 = 0"
+
+[meta.graph]
+force_show_events = [
+    "T0:0:s1l3",
+    "T0:1:s1l3",
+]
+shows = [
+    "iio",
+    "po-loc",
+    "rf",
+]

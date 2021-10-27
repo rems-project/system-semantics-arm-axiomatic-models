@@ -1,0 +1,130 @@
+arch = "AArch64"
+name = "pKVM.host_handle_trap.stage2_idmap.change_block_size"
+symbolic = ["x", "y"]
+
+# since ipa1 is highly aligned on a 2M boundary
+# and ipa2 is 4K aligned and allocated incrementally
+# ipa2 is in the same 2M region as ipa1 but not in the same 4K page
+# ideally we would say `assert pte2(ipa1, vm_stage2) == pte2(ipa2, vm_stage2)`
+# but this is invalid in isla right now
+page_table_setup = """
+option default_tables = false;
+physical pa1 pa2;
+intermediate ipa1 ipa2;
+
+s2table vm_stage2 0x260000  {
+    ipa1 |-> invalid at level 3;
+    ipa2 |-> pa2 at level 3;
+    ipa1 ?-> pa1 at level 3;
+
+    ipa1 ?-> invalid at level 2;
+    ipa2 ?-> invalid at level 2;
+    ipa2 ?-> pa2 at level 2;
+
+    s1table host_s1 0x2C0000 {
+        x |-> ipa1;
+        y |-> ipa2;
+    }
+};
+
+s1table hyp_map 0x200000  {
+    x |-> invalid;
+    s2table vm_stage2;
+    identity 0x1000 with code;
+}
+
+*pa1 = 1;
+*pa2 = 2;
+"""
+
+[thread.0]
+init = {}
+code = """
+    // in guest
+    MOV X0,#0
+    LDR X0,[X1]
+    MOV X2,#0
+    LDR X2,[X3]
+"""
+
+[thread.0.reset]
+R1 = "x"
+R3 = "y"
+R10 = "extz(0b0, 64)"
+VBAR_EL2 = "extz(0x1000, 64)"
+
+R12 = "extz(0b0, 64)"
+R13 = "pte2(ipa1, vm_stage2)"
+R14 = "ttbr(vmid=0x001, base=extz(0b0, 64))"
+R15 = "extz(ipa1, 64)"
+R16 = "ttbr(vmid=0x001, base=vm_stage2)"
+R17 = "mkdesc2(oa=pa2)"
+R18 = "pte2(x, vm_stage2)"
+
+TTBR0_EL1 = "ttbr(asid=0x0000, base=host_s1)"
+TTBR0_EL2 = "ttbr(asid=0x0000, base=hyp_map)"
+VTTBR_EL2 = "ttbr(vmid=0x0001, base=vm_stage2)"
+
+# start at EL1
+"PSTATE.EL" = "0b01"
+
+[section.thread0_el2_handler]
+address = "0x1400"
+code = """
+// count number of exceptions
+    ADD X10,X10,#1
+// remember which IPA failed
+    MRS X9,HPFAR_EL2
+
+// on second fault just exit test
+    CMP X10,#2
+    B.EQ 1f
+
+// then pkvm code
+0:
+    STR X12,[X13] // pgtable.c:181
+    DSB ISH // tlb.c:116
+    MSR VTTBR_EL2,X14 // tlb.c:119
+    ISB // tlb.c:119
+    TLBI vmalls12e1is // tlb.c:121
+    DSB ISH // tlb.c:122
+    ISB // tlb.c:123
+    MSR VTTBR_EL2,X16 // tlb.c:125
+    ISB // tlb.c:125
+    STLR X17,[X18]
+    DSB ISHST
+
+1:
+// return to next instruction
+// pKVM doesn't really do this, it just tries the same instr again
+// but without this the test can loop forever ...
+    MRS X20,ELR_EL2
+    ADD X20,X20,#4
+    MSR ELR_EL2,X20
+
+// return from handle_trap
+    ERET
+"""
+
+[final]
+# take the second exception
+# or somehow read the old stale translation still
+assertion = "0:X10=2 | 0:X2=1"
+
+[graph]
+force_show_events = [
+    "T0:1:s1l3",
+    "T0:1:s2l2",
+    "T0:1:s2l3",
+    "T0:21:s1l3",
+    "T0:21:s2l2",
+    "T0:21:s2l3",
+]
+shows = [
+    "iio",
+    "po",
+    "rf",
+    "trf",
+    "same-vmid",
+    "tlb_affects",
+]

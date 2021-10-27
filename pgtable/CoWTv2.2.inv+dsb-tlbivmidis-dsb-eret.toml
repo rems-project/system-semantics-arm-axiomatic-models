@@ -1,0 +1,48 @@
+arch = "AArch64"
+name = "CoWTv2.2.inv+dsb-tlbivmidis-dsb-eret"
+symbolic = ["x"]
+
+page_table_setup = """
+    physical pa1;
+    intermediate ipa1;
+
+    x |-> ipa1;
+    ipa1 |-> invalid;
+    ipa1 ?-> pa1;
+
+    *pa1 = 1;
+    identity 0x2000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    DSB SY
+    TLBI VMALLS12E1IS
+    DSB SY
+    ERET
+L0:
+    LDR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "mkdesc3(oa=pa1)"
+R1 = "pte3(ipa1, s2_page_table_base)"
+R3 = "x"
+VBAR_EL2 = "extz(0x2000, 64)"
+
+"PSTATE.EL" = "0b10"
+
+# return to EL1t at L0
+SPSR_EL2 = "extz(0b00101, 64)"
+ELR_EL2 = "L0:"
+
+[section.thread0_el2_handler]
+address = "0x2400"  # +0x400 -> Exception from Lower Exception Level
+code = """
+    MOV X2,#0
+"""
+
+[final]
+assertion = "0:X2 = 0"

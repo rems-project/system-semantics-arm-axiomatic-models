@@ -1,0 +1,52 @@
+arch = "AArch64"
+name = "CoWTf.inv+svc"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1;
+    x |-> invalid;
+    x ?-> pa1;
+    y |-> pa1;
+    *y = 1;
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    SVC #0x0
+"""
+
+[thread.0.reset]
+R0 = "desc3(y, page_table_base)"
+R1 = "pte3(x, page_table_base)"
+R3 = "x"
+VBAR_EL1 = "extz(0x1000, 64)"
+
+"PSTATE.EL" = "0b00"
+"PSTATE.SP" = "0b0"
+
+[section.thread0_el1_handler_same_exc]
+address = "0x1200"
+code = """
+    MOV X2,#0
+
+    MRS X20,ELR_EL1
+    ADD X20,X20,#4
+    MSR ELR_EL1,X20
+    ERET
+"""
+
+[section.thread0_el1_handler_lower_exc]
+address = "0x1400"
+code = """
+    MRS X10,ELR_EL1
+    LDR X2,[X3]
+    MSR ELR_EL1,X10
+    ERET
+"""
+
+[final]
+expect = "sat"
+assertion = "0:X2 = 0"

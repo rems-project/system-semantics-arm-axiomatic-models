@@ -1,0 +1,55 @@
+arch = "AArch64"
+name = "CoRpteT.EL1+dsb-tlbi-dsb"
+symbolic = ["x"]
+
+page_table_setup = """
+    physical pa1;
+
+    x |-> pa1;
+    x ?-> invalid;
+    identity 0x1000 with code;
+
+    *pa1 = 0;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b0, 64)"
+R1 = "pte3(x, page_table_base)"
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    DSB SY
+    TLBI VAE1,X4
+    DSB SY
+    LDR X2,[X3]
+"""
+
+[thread.1.reset]
+R1 = "pte3(x, page_table_base)"
+R3 = "x"
+R4 = "extz(page(x), 64)"
+VBAR_EL1 = "extz(0x1000, 64)"
+
+"PSTATE.EL" = "0b01"
+
+[section.thread1_el1_handler]
+address = "0x1400"
+code = """
+    MOV X2,#1
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+assertion = "1:X0=0 & 1:X2=0"

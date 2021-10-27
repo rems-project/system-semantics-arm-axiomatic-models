@@ -1,0 +1,55 @@
+arch = "AArch64"
+name = "RSW.alias"
+symbolic = ["w", "x", "y", "z"]
+
+page_table_setup = """
+    physical pa1 pa2 pa3;
+    w |-> pa1;
+    x |-> pa1;
+    y |-> pa2;
+    z |-> pa3;
+    *pa1 = 0;
+    *pa2 = 0;
+    *pa3 = 0;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    DMB SY
+    STR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b1, 64)"
+R1 = "z"
+R2 = "extz(0b1, 64)"
+R3 = "y"
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    EOR X2,X0,X0
+    LDR X3,[X4,X2]
+    LDR X5,[X6]
+    EOR X7,X5,X5
+    LDR X8,[X9,X7]
+"""
+
+[thread.1.reset]
+R1 = "y"
+R4 = "w"
+R6 = "x"
+R9 = "z"
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[final]
+assertion = "1:X0=1 & 1:X8=0"
+
+[meta.graph]
+shows = ["co","rf","po"]

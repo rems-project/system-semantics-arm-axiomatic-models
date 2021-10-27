@@ -1,0 +1,56 @@
+arch = "AArch64"
+name = "pKVM.create_hyp_mappings.inv.l3"
+symbolic = ["x"]
+
+page_table_setup = """
+option default_tables = false;
+
+physical pa1;
+
+s1table hyp_pgtable 0x200000  {
+    x |-> invalid at level 3;
+    x ?-> pa1;
+    identity 0x1000 with code;
+}
+
+*pa1 = 1;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STLR X0,[X1]
+    DSB SY
+    ISB
+L0:
+    LDR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "mkdesc3(oa=pa1)"
+R1 = "pte3(x, hyp_pgtable)"
+R3 = "x"
+VBAR_EL2 = "extz(0x1000, 64)"
+TTBR0_EL2 = "ttbr(asid=0x0000, base=hyp_pgtable)"
+"PSTATE.EL" = "0b10"
+
+[section.thread0_el2_handler]
+address = "0x1000"
+code = """
+    MOV X2,#0
+"""
+
+[final]
+assertion = "0:X2 = 0"
+
+[graph]
+force_show_events = [
+    "T0:3:s1l3",
+]
+shows = [
+    "iio",
+    "po",
+    "rf",
+    "trf",
+]
+

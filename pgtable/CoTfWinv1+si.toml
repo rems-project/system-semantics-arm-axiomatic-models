@@ -1,0 +1,39 @@
+arch = "AArch64"
+name = "CoTfW1.inv+si"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    identity 0x1000 with code;
+"""
+# like to include:
+#   assert pte3(x, page_table_base)==pa1;
+#  but isla does not allow.
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b10, 64)"
+R1 = "pte3(0x1000,page_table_base)"
+
+VBAR_EL1 = "extz(0x1000, 64)"
+
+"PSTATE.EL" = "0b00"
+"PSTATE.SP" = "0b0"
+
+[section.thread0_el1_handler]
+address = "0x1400"
+code = """
+    MOV X0,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+assertion = "0:X0 = 0"

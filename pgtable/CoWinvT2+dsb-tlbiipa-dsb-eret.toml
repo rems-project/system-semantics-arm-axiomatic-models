@@ -1,0 +1,55 @@
+arch = "AArch64"
+name = "CoWinvT2+dsb-tlbiipa-dsb-eret"
+symbolic = ["x"]
+
+page_table_setup = """
+    physical pa1;
+    intermediate ipa1;
+
+    x |-> ipa1;
+
+    ipa1 |-> invalid;
+    ipa1 ?-> pa1;
+
+    *pa1 = 1;
+
+    identity 0x2000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    DSB SY
+    TLBI IPAS2E1,X4
+    DSB SY
+    ERET
+L0:
+    LDR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "mkdesc3(oa=pa1)"
+R1 = "pte3(ipa1, s2_page_table_base)"
+R3 = "x"
+R4 = "extz(page(ipa1), 64)"
+VBAR_EL2 = "extz(0x2000, 64)"
+
+"PSTATE.EL" = "0b10"
+# return to EL1h at L0
+SPSR_EL2 = "extz(0b00100, 64)"
+ELR_EL2 = "L0:"
+
+[section.thread0_el2_handler_lower_exc]
+address = "0x2400"
+code = """
+    MOV X2,#0
+
+    MRS X20,ELR_EL2
+    ADD X20,X20,#4
+    MSR ELR_EL2,X20
+    ERET
+"""
+
+[final]
+assertion = "0:X2 = 0"

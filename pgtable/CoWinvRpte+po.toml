@@ -1,0 +1,26 @@
+arch = "AArch64"
+name = "CoWinvRpte+po"
+symbolic = ["x"]
+
+page_table_setup = """
+    physical pa1;
+    x |-> pa1;
+    x ?-> invalid;
+
+    *pa1 = 1;
+"""
+
+[thread.0]
+code = """
+    STR X0,[X1]
+    LDR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0x0, 64)"
+R1 = "pte3(x, page_table_base)"
+R3 = "pte3(x, page_table_base)"
+"PSTATE.EL" = "0b01"
+
+[final]
+assertion = "~(0:X2 = 0)"

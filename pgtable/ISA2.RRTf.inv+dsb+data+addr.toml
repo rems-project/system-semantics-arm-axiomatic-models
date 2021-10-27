@@ -1,0 +1,76 @@
+arch = "AArch64"
+name = "ISA2.RRTf.inv+dsb+data+addr"
+symbolic = ["u", "x", "y", "z"]
+
+page_table_setup = """
+    physical pa1 pa2 pa3;
+    x |-> invalid;
+    x ?-> pa1;
+    u |-> pa1;
+    *pa1 = 1;
+
+    y |-> pa2;
+    *pa2 = 0;
+
+    z |-> pa3;
+    *pa3 = 0;
+
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    DSB SY
+    STR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "desc3(u, page_table_base)"
+R1 = "pte3(x, page_table_base)"
+R2 = "extz(0b1, 64)"
+R3 = "y"
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    EOR X2,X0,X0
+    ORR X3,X3,X2
+    STR X3,[X4]
+"""
+
+[thread.1.reset]
+R1 = "y"
+R3 = "extz(0b1, 64)"
+R4 = "z"
+
+[thread.2]
+init = {}
+code = """
+    LDR X0,[X1]
+    EOR X2,X0,X0
+    LDR X3,[X4,X2]
+"""
+
+[thread.2.reset]
+R1 = "z"
+R4 = "x"
+VBAR_EL1 = "extz(0x1000, 64)"
+"PSTATE.EL" = "0b00"
+"PSTATE.SP" = "0b0"
+
+[section.thread2_el1_handler]
+address = "0x1400"
+code = """
+    MOV X3,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+assertion = "1:R0 = 1 & 2:X0=1 & 2:X3 = 0"

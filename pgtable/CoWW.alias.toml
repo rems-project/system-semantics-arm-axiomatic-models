@@ -1,0 +1,35 @@
+arch = "AArch64"
+name = "CoWW.alias"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1;
+    x |-> pa1;
+    y |-> pa1;
+    *pa1 = 0;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    STR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b01, 64)"
+R1 = "x"
+R2 = "extz(0b10, 64)"
+R3 = "y"
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[final]
+assertion = "*x=1"
+
+# tell the final assertion x is 64bit
+[types]
+x = "uint64_t"
+
+[meta.graph]
+shows = ["co","po"]

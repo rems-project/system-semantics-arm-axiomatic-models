@@ -1,0 +1,53 @@
+arch = "AArch64"
+name = "CoTfRpte+dsb-isb"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1;
+    x |-> pa1;
+    x ?-> invalid;
+    y |-> pa1;
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b0, 64)"
+R1 = "pte3(x, page_table_base)"
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    DSB SY
+    ISB
+    LDR X2,[X3]
+"""
+
+[thread.1.reset]
+R1 = "x"
+R3 = "pte3(x, page_table_base)"
+VBAR_EL1 = "extz(0x1000, 64)"
+
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[section.thread1_el1_handler]
+address = "0x1400"
+code = """
+    MOV X0,#1
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+expect = "sat"
+assertion = "1:X0 = 1 & 1:X2=desc3(y, page_table_base)"

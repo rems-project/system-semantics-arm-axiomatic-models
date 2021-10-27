@@ -1,0 +1,52 @@
+arch = "AArch64"
+name = "CoTTf.inv+po"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1;
+    x |-> invalid;
+    x ?-> pa1;
+    y |-> pa1;
+    *pa1 = 1;
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+"""
+
+[thread.0.reset]
+R0 = "desc3(y, page_table_base)"
+R1 = "pte3(x, page_table_base)"
+
+[thread.1]
+init = {}
+code = """
+    LDR X2,[X1]
+    MOV X0,X2
+    LDR X2,[X3]
+"""
+
+[thread.1.reset]
+R1 = "x"
+R3 = "x"
+VBAR_EL1 = "extz(0x1000, 64)"
+
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[section.thread1_el1_handler]
+address = "0x1400"
+code = """
+    MOV X2,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+assertion = "1:X0 = 1 & 1:X2=0"

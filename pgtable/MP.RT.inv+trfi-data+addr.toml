@@ -1,0 +1,74 @@
+arch = "AArch64"
+name = "MP.RT.inv+trfi-data+addr.toml"
+symbolic = ["w", "x", "y"]
+
+page_table_setup = """
+    physical pa1 pa2;
+    w |-> invalid;
+    w ?-> pa1;
+    x |-> pa1;
+    *pa1 = 1;
+
+    y |-> pa2;
+    identity 0x1000 with code;
+    identity 0x2000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    LDR X2,[X3]
+    STR X4,[X5]
+"""
+
+[thread.0.reset]
+R0 = "desc3(x, page_table_base)"
+R1 = "pte3(w, page_table_base)"
+R3 = "w"
+R4 = "extz(0b1, 64)"
+R5 = "y"
+VBAR_EL1 = "extz(0x1000, 64)"
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[section.thread0_el1_handler]
+address = "0x1400"
+code = """
+    MOV X2,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    EOR X2,X0,X0
+    LDR X3,[X4,X2]
+"""
+
+[thread.1.reset]
+R1 = "y"
+R3 = "pte3(w, page_table_base)"
+R4 = "w"
+VBAR_EL1 = "extz(0x2000, 64)"
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[section.thread1_el1_handler]
+address = "0x2400"
+code = """
+    MOV X3,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+assertion = "0:X2=1 & 1:X0=1 & 1:X3=0"

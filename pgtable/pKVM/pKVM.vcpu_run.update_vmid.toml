@@ -1,0 +1,90 @@
+arch = "AArch64"
+name = "pKVM.vcpu_run.update_vmid"
+symbolic = ["x"]
+
+page_table_setup = """
+option default_tables = false;
+physical pa1 pa2;
+intermediate ipa1 ipa2;
+
+s1table hyp_map 0x200000 {
+    x |-> invalid;
+}
+
+s2table vm1_stage2 0x300000 {
+    ipa1 |-> pa1;
+    ipa2 |-> invalid;
+
+    s1table vm1_stage1 0x280000 {
+        x |-> ipa1;
+    }
+}
+
+s2table vm2_stage2 0x380000 {
+    ipa1 |-> invalid;
+    ipa2 |-> pa2;
+
+    s1table vm2_stage1 0x2C0000 {
+        x |-> ipa2;
+    }
+}
+
+*pa2 = 1;
+"""
+
+[thread.0]
+init = {}
+code = """
+    DSB ISHST // kvm/hyp/nvhe/tlb.c:145
+    TLBI ALLE1IS // kvm/hyp/nvhe/tlb.c:146
+    DSB SY // kvm/hyp/nvhe/tlb.c:160
+    MSR TTBR0_EL1,X0  // kvm/hyp/sysreg-sr.h:96
+    MSR VTTBR_EL2,X1  // include/asm/kvm_mmu.h:276
+    ERET // kvm/hyp/nvhe/host.S
+L0:
+    LDR X2,[X3] // in guest
+"""
+
+[thread.0.reset]
+R0 = "ttbr(asid=0x0000, base=vm2_stage1)"
+R1 = "ttbr(vmid=0x0001, base=vm2_stage2)" # same VMID(!)
+
+TTBR0_EL2 = "ttbr(asid=0x0000, base=hyp_map)"
+VTTBR_EL2 = "ttbr(vmid=0x0001, base=vm1_stage2)"
+TTBR0_EL1 = "ttbr(asid=0x0000, base=vm1_stage1)"
+
+R3 = "x"
+VBAR_EL2 = "extz(0x1000, 64)"
+
+"PSTATE.EL" = "0b10"
+"PSTATE.SP" = "0b1"
+
+# return to EL1h at L0
+SPSR_EL2 = "extz(0b00101, 64)"
+ELR_EL2 = "L0:"
+
+[section.thread0_el2_handler]
+address = "0x1400" # 0x400 - Lower Exception Level AArch64
+code = """
+    MOV X2,#0
+
+// data abort preferred-return-address is itself
+// so jump to next instr instead
+    MRS X20,ELR_EL2
+    ADD X20,X20,#4
+    MSR ELR_EL2,X20
+    ERET
+"""
+
+[final]
+expect = "sat"
+assertion = "0:X2 = 0"
+
+[graph]
+force_show_events = [
+    "T0:6:s2l3",
+]
+shows = [
+    "iio",
+    "po",
+]

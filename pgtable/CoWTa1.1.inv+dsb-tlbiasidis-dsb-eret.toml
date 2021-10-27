@@ -1,0 +1,53 @@
+arch = "AArch64"
+name = "CoWTa1.1.inv+dsb-tlbiasidis-dsb-eret"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1;
+    x |-> invalid;
+    x ?-> pa1;
+
+    y |-> pa1;
+
+    *pa1 = 1;
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    DSB SY
+    TLBI ASIDE1IS,X4
+    DSB SY
+    ERET
+L0:
+    LDR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "desc3(y, page_table_base)"
+R1 = "pte3(x, page_table_base)"
+R3 = "x"
+R4 = "asid(0x1)"
+VBAR_EL1 = "extz(0x1000, 64)"
+
+TTBR0_EL1 = "ttbr(asid=0x0001, base=page_table_base)"
+
+"PSTATE.EL" = "0b01"
+# return to EL0h at L0
+SPSR_EL1 = "extz(0b00000, 64)"
+ELR_EL1 = "L0:"
+
+[section.thread0_el1_handler]
+address = "0x1400"
+code = """
+    MOV X2,#0
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+assertion = "0:X2 = 0"

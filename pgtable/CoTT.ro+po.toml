@@ -1,0 +1,38 @@
+arch = "AArch64"
+name = "CoTT.ro+po"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1 pa2;
+    x |-> pa1 with [AP = 0b11] and default;
+    x ?-> pa2 with [AP = 0b11] and default;
+    y |-> pa2 with [AP = 0b11] and default;
+
+    *pa2 = 1;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+"""
+
+[thread.0.reset]
+R0 = "desc3(y, page_table_base)"
+R1 = "pte3(x, page_table_base)"
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    LDR X2,[X3]
+"""
+
+[thread.1.reset]
+R1 = "x"
+R3 = "x"
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[final]
+assertion = "1:X0 = 1 & 1:X2=0"

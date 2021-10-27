@@ -1,0 +1,49 @@
+arch = "AArch64"
+name = "SwitchTable.EL2+msrttbr-eret"
+symbolic = ["x"]
+
+page_table_setup = """
+option default_tables = false;
+physical pa1 pa2;
+
+s1table initial_table 0x200000 {
+    x |-> pa1 at level 3;
+}
+
+s1table new_table 0x280000  {
+    x |-> pa2 at level 3;
+}
+
+s1table el2_table 0x300000 {
+    identity 0x2000 with code;
+}
+
+*pa1 = 0;
+*pa2 = 1;
+"""
+
+[thread.0]
+init = {}
+code = """
+    LDR X0,[X1]
+    HVC #0
+    LDR X2,[X3]
+"""
+
+[thread.0.reset]
+R1 = "x"
+R3 = "x"
+VBAR_EL2 = "extz(0x2000, 64)"
+TTBR0_EL1 = "ttbr(asid=0x0000, base=initial_table)"
+TTBR0_EL2 = "ttbr(asid=0x0000, base=el2_table)"
+R4 = "ttbr(asid=0x0000, base=new_table)"
+
+[section.thread0_el1_handler]
+address = "0x1400"
+code = """
+    MSR TTBR0_EL1,X4
+    ERET
+"""
+
+[final]
+assertion = "0:X2 = 0"

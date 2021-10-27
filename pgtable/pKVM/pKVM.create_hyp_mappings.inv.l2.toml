@@ -1,0 +1,73 @@
+arch = "AArch64"
+name = "pKVM.create_hyp_mappings.inv.l2"
+symbolic = ["x"]
+
+page_table_setup = """
+option default_tables = false;
+physical pa1;
+
+s1table hyp_pgtable_new 0x280000 {
+    x |-> invalid at level 3;
+    x ?-> pa1 at level 3;
+}
+
+s1table hyp_pgtable 0x200000  {
+    x |-> invalid at level 2;
+    x ?-> table(0x283000) at level 2;
+    identity 0x1000 with code;
+    s1table hyp_pgtable_new;
+}
+
+*pa1 = 1;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STLR X0,[X1]
+    STLR X2,[X3]
+    DSB SY
+    ISB
+L0:
+    LDR X4,[X5]
+"""
+
+[thread.0.reset]
+R0 = "mkdesc2(table=extz(0x283000, 64))"
+R1 = "pte2(x, hyp_pgtable)"
+R2 = "mkdesc3(oa=pa1)"
+R3 = "bvor(extz(0x283000, 64), offset(level=3,va=x))"
+
+R5 = "x"
+
+VBAR_EL2 = "extz(0x1000, 64)"
+TTBR0_EL2 = "ttbr(asid=0x0000, base=hyp_pgtable)"
+"PSTATE.EL" = "0b10"
+"PSTATE.SP" = "0b1"
+
+[section.thread0_el2_handler]
+address = "0x1200"
+code = """
+    MOV X2,#0
+
+    MRS X20,ELR_EL2
+    ADD X20,X20,#4
+    MSR ELR_EL2,X20
+    ERET
+"""
+
+[final]
+expect = "sat"
+assertion = "0:X2 = 0"
+
+[graph]
+force_show_events = [
+    "T0:4:s1l2",
+    "T0:4:s1l3",
+]
+shows = [
+    "iio",
+    "po",
+    "rf",
+    "trf",
+]

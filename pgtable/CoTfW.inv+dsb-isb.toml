@@ -1,0 +1,70 @@
+arch = "AArch64"
+name = "CoTfW.inv+dsb-isb"
+symbolic = ["x"]
+
+page_table_setup = """
+    physical pa1;
+    x |-> invalid;
+    x ?-> pa1;
+    x ?-> raw(2);
+    *pa1 = 1;
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+"""
+
+[thread.0.reset]
+R0 = "mkdesc3(oa=pa1)"
+R1 = "pte3(x, page_table_base)"
+
+"PSTATE.EL" = "0b00"
+"PSTATE.SP" = "0b0"
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    DSB SY
+    ISB
+    STR X2,[X3]
+"""
+
+[thread.1.reset]
+R1 = "x"
+R2 = "extz(0b10, 64)"
+R3 = "pte3(x, page_table_base)"
+
+VBAR_EL1 = "extz(0x1000, 64)"
+
+"PSTATE.EL" = "0b00"
+"PSTATE.SP" = "0b0"
+
+[section.thread1_el1_handler]
+address = "0x1400"
+code = """
+    MOV X0,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[thread.2]
+init = {}
+code = """
+    LDR X0,[X1]
+    LDR X2,[X1]
+"""
+
+[thread.2.reset]
+R1 = "pte3(x, page_table_base)"
+
+[final]
+assertion = "1:X0 = 1 & 2:X0=2 & 2:X2=mkdesc3(oa=pa1)"
+# ideally we'd just say *pte3(x, page_table_base)=mkdesc3(oa=pa1) in the final state here
+# but due to syntactic limitations of the final state in isla we have Thread#2 to do the co-check for us

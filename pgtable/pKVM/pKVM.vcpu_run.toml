@@ -1,0 +1,74 @@
+arch = "AArch64"
+name = "pKVM.vcpu_run"
+symbolic = []
+
+page_table_setup = """
+option default_tables = false;
+
+virtual x;
+physical pa1 pa2;
+intermediate ipa1 ipa2;
+
+s1table hyp_map 0x200000 {
+  identity 0x1000 with code;
+  x |-> invalid;
+}
+s1table vm1_stage1 0x2C0000 {
+  x |-> ipa1;
+}
+s1table vm2_stage1 0x300000 {
+  x |-> ipa2;
+}
+s2table vm1_stage2 0x240000 {
+  ipa1 |-> pa1;
+  ipa2 |-> invalid;
+  s1table vm1_stage1;
+}
+s2table vm2_stage2 0x280000 {
+  ipa1 |-> invalid;
+  ipa2 |-> pa2;
+  s1table vm2_stage1;
+}
+*pa2 = 1;
+"""
+
+[thread.0]
+code = """
+    MSR TTBR0_EL1,X0 // kvm/hyp/sysreg-sr.h:96
+    MSR VTTBR_EL2,X1 // include/asm/kvm_mmu.h:276
+    ERET              // kvm/hyp/nvhe/host.S
+  L0:
+    LDR X2,[X3] // in guest
+"""
+
+[thread.0.reset]
+R0 = "ttbr(asid=0x00, base=vm2_stage1)"
+R1 = "ttbr(vmid=0x0002, base=vm2_stage2)"
+TTBR0_EL2 = "ttbr(asid=0x00, base=hyp_map)"
+VTTBR_EL2 = "ttbr(vmid=0x0001, base=vm1_stage2)"
+TTBR0_EL1 = "ttbr(asid=0x00, base=vm1_stage1)"
+R3 = "x"
+VBAR_EL2 = "extz(0x1000, 64)"
+"PSTATE.EL" = "0b10"
+
+# make ERET return to EL1h at L0
+SPSR_EL2 = "extz(0b00101, 64)"
+ELR_EL2 = "extz(L0:, 64)"
+
+[section.thread0_el2_handler]
+address = "0x1400" # 0x400 - Lower Exception Level
+code = """
+    MOV X2,#0
+"""
+
+[final]
+assertion = "0:X2=0"
+
+[graph]
+force_show_events = [
+    "T0:3:s2l3",
+]
+shows = [
+    "iio",
+    "po",
+]

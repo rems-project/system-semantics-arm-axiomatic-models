@@ -1,0 +1,41 @@
+arch = "AArch64"
+name = "MP.alias3+rfi-data+dmb"
+symbolic = ["x", "y", "z"]
+
+page_table_setup = """
+    physical pa1 pa2;
+    x |-> pa1;
+    y |-> pa2;
+    z |-> pa1;
+    *pa1 = 0;
+    *pa2 = 0;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    LDR X2,[X3]
+    STR X2,[X5]
+"""
+
+[thread.0.reset]
+R0 = "extz(0x1, 64)"
+R1 = "x"
+R3 = "z"
+R5 = "y"
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    DMB SY
+    LDR X2,[X3]
+"""
+
+[thread.1.reset]
+R1 = "y"
+R3 = "x"
+
+[final]
+assertion = "1:X0 = 1 & 1:X2 = 0"

@@ -1,0 +1,97 @@
+arch = "AArch64"
+name = "IRIW.TTf.TTf.inv+addrs"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1 pa2;
+    x |-> invalid;
+    x ?-> pa1;
+    u |-> pa1;
+    *pa1 = 1;
+
+    y |-> invalid;
+    y ?-> pa2;
+    v |-> pa2;
+    *pa2 = 1;
+
+    identity 0x1000 with code;
+    identity 0x2000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+"""
+
+[thread.0.reset]
+R0 = "desc3(u, page_table_base)"
+R1 = "pte3(x, page_table_base)"
+
+[thread.1]
+init = {}
+code = """
+    STR X0,[X1]
+"""
+
+[thread.1.reset]
+R0 = "desc3(v, page_table_base)"
+R1 = "pte3(y, page_table_base)"
+
+[thread.2]
+init = {}
+code = """
+    LDR X0,[X1]
+    EOR X4,X0,X0
+    LDR X2,[X3,X4]
+"""
+
+[thread.2.reset]
+R1 = "x"
+R3 = "y"
+
+VBAR_EL1 = "extz(0x1000, 64)"
+"PSTATE.EL" = "0b00"
+"PSTATE.SP" = "0b0"
+
+[section.thread2_el1_handler]
+address = "0x1400"
+code = """
+    MOV X2,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[thread.3]
+init = {}
+code = """
+    LDR X0,[X1]
+    EOR X4,X0,X0
+    LDR X2,[X3,X4]
+"""
+
+[thread.3.reset]
+R1 = "y"
+R3 = "x"
+
+VBAR_EL1 = "extz(0x2000, 64)"
+"PSTATE.EL" = "0b00"
+"PSTATE.SP" = "0b0"
+
+[section.thread3_el1_handler]
+address = "0x2400"
+code = """
+    MOV X2,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+expect = "sat"
+assertion = "2:X0 = 1 & 2:X2=0 & 3:X0 = 1 & 3:X2=0"

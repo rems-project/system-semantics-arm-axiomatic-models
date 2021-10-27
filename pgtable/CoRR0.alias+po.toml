@@ -1,0 +1,36 @@
+arch = "AArch64"
+name = "CoRR0.alias+po"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1;
+    x |-> pa1;
+    y |-> pa1;
+    *pa1 = 0;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b1, 64)"
+R1 = "x"
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    LDR X2,[X3]
+"""
+
+[thread.1.reset]
+R1 = "x"
+R3 = "y"
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[final]
+assertion = "1:X0=1 & 1:X2=0"

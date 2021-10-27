@@ -1,0 +1,114 @@
+arch = "AArch64"
+name = "pKVM.host_handle_trap.stage2_idmap.l3.already_exists"
+symbolic = ["x"]
+
+page_table_setup = """
+option default_tables = false;
+physical pa1 pa2;
+intermediate ipa1;
+
+s2table vm_stage2 0x260000  {
+    ipa1 |-> pa1 with [AP=0b00] and default;
+    ipa1 ?-> invalid;
+    ipa1 ?-> pa2;
+
+    s1table host_s1 0x2C0000 {
+        x |-> ipa1;
+    }
+}
+
+s1table hyp_map 0x200000  {
+    x |-> invalid;
+    s2table vm_stage2;
+    identity 0x1000 with code;
+}
+
+*pa1 = 1;
+*pa2 = 2;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    LDR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b0, 64)"
+R1 = "x"
+R3 = "x"
+R10 = "extz(0b0, 64)"
+VBAR_EL2 = "extz(0x1000, 64)"
+
+R12 = "extz(0b0, 64)"
+R13 = "pte3(ipa1, vm_stage2)"
+R14 = "ttbr(vmid=0x001, base=extz(0b0, 64))"
+R15 = "extz(page(ipa1), 64)"
+R16 = "ttbr(vmid=0x001, base=vm_stage2)"
+R17 = "mkdesc3(oa=pa2)"
+R18 = "pte3(ipa1, vm_stage2)"
+
+TTBR0_EL1 = "ttbr(asid=0x000, base=host_s1)"
+TTBR0_EL2 = "ttbr(asid=0x000, base=hyp_map)"
+VTTBR_EL2 = "ttbr(vmid=0x001, base=vm_stage2)"
+
+# start at EL1
+"PSTATE.EL" = "0b01"
+
+[section.thread0_el2_handler]
+address = "0x1400"
+code = """
+// count number of exceptions
+    ADD X10,X10,#1
+// remember which IPA failed
+    MRS X9,HPFAR_EL2
+
+// really pKVM would do a read of the pagetable to tell if it needs to update
+// we elide that code from the test and just skip on the second fault
+    CMP X10,#2
+    B.EQ 1f
+
+// pkvm code
+    STR X12,[X13] // pgtable.c:573
+    DSB ISH // tlb.c:63
+    MSR VTTBR_EL2,X14 // tlb.c:66
+    ISB // tlb.c:66
+    TLBI IPAS2E1IS,X15 // tlb.c:74
+    DSB ISH // tlb.c:82
+    TLBI VMALLE1IS // tlb.c:83
+    DSB ISH // tlb.c:84
+    ISB // tlb.c:85
+    MSR VTTBR_EL2,X16 // tlb.c:109
+    ISB // tlb.c:109
+    STLR X17,[X18]
+    DSB ISHST
+
+// return to next instruction
+// pKVM doesn't really do this, it just tries the same instr again
+// but without this the test can loop forever ...
+1:
+    MRS X20,ELR_EL2
+    ADD X20,X20,#4
+    MSR ELR_EL2,X20
+
+// return from handle_trap
+    ERET
+"""
+
+[final]
+assertion = "0:X10=2 | 0:X2=1"
+
+[graph]
+force_show_events = [
+    "T0:0:s1l3",
+    "T0:0:s2l3",
+    "T0:22:s1l3",
+    "T0:22:s2l3",
+]
+shows = [
+    "iio",
+    "po",
+    "rf",
+    "trf",
+]
