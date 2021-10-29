@@ -1,6 +1,6 @@
 BSD 2-Clause License
 
-This system-litmus-harness tool is subject to the following BSD
+The tests and models in this repository are subject to the following BSD
 2-Clause License.
 
 Copyright (c) 2021 Ben Simner
@@ -12,7 +12,7 @@ All rights reserved.
 
 This software was developed by the University of Cambridge Computer
 Laboratory (Department of Computer Science and Technology), this work
-was partially fundedby an Arm/EPSRC iCASE PhD studentship (Simner),
+was partially funded by an Arm/EPSRC iCASE PhD studentship (Simner),
 Arm Limited, Google, ERC Advanced Grant (AdG) 789108 ELVER, and the
 UK Government Industrial Strategy Challenge Fund (ISCF) under the
 Digital Security by Design (DSbD) Programme, to deliver a DSbDtech
