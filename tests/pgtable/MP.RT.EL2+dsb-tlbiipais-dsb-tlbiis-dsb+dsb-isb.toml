@@ -60,9 +60,9 @@ address = "0x2400"
 code = """
     MOV X2,#1
 
-    MRS X13,ELR_EL1
+    MRS X13,ELR_EL2
     ADD X13,X13,#4
-    MSR ELR_EL1,X13
+    MSR ELR_EL2,X13
     ERET
 """
 
