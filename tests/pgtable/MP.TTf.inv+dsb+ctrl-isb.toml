@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "MP.TTf.inv+dsb+dsb-isb"
+name = "MP.TTf.inv+dsb+ctrl-isb"
 symbolic = ["x", "y", "z"]
 
 page_table_setup = """
