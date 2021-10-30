@@ -1,2 +1,2 @@
 # systems-isla-tests
-Isla-compatible systems-level tests
+Isla-compatible systems-level litmus tests and models
