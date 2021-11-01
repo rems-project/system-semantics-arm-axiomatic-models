@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "SB.TfTf.inv.dmb-ctrl-isbs"
+name = "SB.TfTf.invv+rfi-ctrl-isbs"
 symbolic = ["x", "y", "u", "v"]
 
 page_table_setup = """
