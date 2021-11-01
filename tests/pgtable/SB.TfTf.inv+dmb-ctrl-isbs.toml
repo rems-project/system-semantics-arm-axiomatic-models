@@ -37,7 +37,7 @@ L0:
 R0 = "desc3(u, page_table_base)"
 R1 = "pte3(x, page_table_base)"
 R3 = "y"
-
+R8 = "z"
 VBAR_EL1 = "extz(0x1000, 64)"
 "PSTATE.EL" = "0b00"
 "PSTATE.SP" = "0b0"
@@ -69,7 +69,7 @@ L1:
 R0 = "desc3(v, page_table_base)"
 R1 = "pte3(y, page_table_base)"
 R3 = "x"
-
+R8 = "z"
 VBAR_EL1 = "extz(0x2000, 64)"
 "PSTATE.EL" = "0b00"
 "PSTATE.SP" = "0b0"
