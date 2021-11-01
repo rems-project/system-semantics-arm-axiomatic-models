@@ -1,6 +1,6 @@
 arch = "AArch64"
 name = "IRIW.TTf.TTf.inv+addrs"
-symbolic = ["x", "y"]
+symbolic = ["x", "y", "u", "v"]
 
 page_table_setup = """
     physical pa1 pa2;
