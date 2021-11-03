@@ -59,6 +59,11 @@ ELR_EL2 = "extz(L0:, 64)"
 address = "0x1400" # 0x400 - Lower Exception Level
 code = """
     MOV X2,#0
+    
+    MRS X20,ELR_EL2
+    ADD X20,X20,#4
+    MSR ELR_EL2,X20
+    ERET
 """
 
 [final]
