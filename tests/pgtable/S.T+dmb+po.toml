@@ -1,6 +1,6 @@
 arch = "AArch64"
 name = "S.T+dmb+po"
-symbolic = ["x", "y", "z"]
+symbolic = ["x", "y"]
 
 page_table_setup = """
     physical pa1 pa2;
