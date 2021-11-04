@@ -188,7 +188,7 @@ let ctxob =
   | [CSE] ; instruction-order
  (* context-synchronization acts as a barrier for context-changing operations *)
   | [ContextChange] ; po ; [CSE]
-  | ctrl ; [ISB] (* ideally  speculative ; CSE  but that might be too strong *)
+  | ctrl ; [ISB] (* ideally, speculative ; [CSE], but that might be too strong *)
 
 (* ordered-before a translation fault *)
 let obfault =
