@@ -1,0 +1,82 @@
+arch = "AArch64"
+name = "MP.RT.inv+dmb+addr-po-msr-isb"
+symbolic = ["x", "y", "z"]
+
+page_table_setup = """
+    physical pa1 pa2 pa3;
+
+    x |-> invalid;
+    x ?-> pa1;
+
+    y |-> pa2;
+
+    z |-> pa3;
+
+    *pa1 = 1;
+    *pa2 = 0;
+    *pa3 = 0;
+
+    identity 0x1000 with code;
+    identity 0x2000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    DMB SY
+    STR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "mkdesc3(oa=pa1)"
+R1 = "pte3(x, page_table_base)"
+R2 = "extz(0b1, 64)"
+R3 = "y"
+
+[thread.1]
+init = {}
+code = """
+    LDR X2,[X1]
+    EOR X6,X2,X2
+    LDR X7,[X8,X6]
+    MSR ELR_EL1,X5
+    ISB
+    LDR X4,[X3]
+"""
+
+[thread.1.reset]
+R1 = "y"
+R3 = "x"
+R5 = "extz(0x1000, 64)"
+R8 = "z"
+VBAR_EL1 = "extz(0x1000, 64)"
+VBAR_EL2 = "extz(0x2000, 64)"
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b01"
+
+[section.thread1_el1_handler]
+address = "0x1400"
+code = """
+    MOV X4,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[section.thread1_el2_handler]
+address = "0x2400"
+code = """
+    MOV X4,#0
+
+    MRS X13,ELR_EL2
+    ADD X13,X13,#4
+    MSR ELR_EL2,X13
+    ERET
+"""
+
+[final]
+expect = "sat"
+assertion = "1:X2=1 & 1:X4=0"
