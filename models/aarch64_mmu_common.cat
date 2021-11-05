@@ -130,7 +130,7 @@ let tlb_affects =
 let maybe_TLB_cached =
   (trf^-1 ; wco ; [TLBI-S1]) & tlb_affects^-1
 
-(* squash tseq and maybe_TLB_barrired together
+(* squash tseq and maybe_TLB_barriered together
  * now we have t TLB_barrier tlbi iff the tlbi hides t *)
 let _TLB_barrier = ([TLBI] ; tlb_affects ; [T] ; tfr ; [W])^-1
 let TLB_barrier = _TLB_barrier & wco
