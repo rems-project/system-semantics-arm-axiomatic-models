@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "WDS+po-dsb-tlbiipa-dsb-eret"
+name = "WDS+dsb-tlbiipa-dsb-eret-po"
 symbolic = ["x"]
 
 page_table_setup = """
@@ -22,12 +22,12 @@ page_table_setup = """
 init = {}
 code = """
     STR X0,[X1]
-    STR X2,[X3]
     DSB SY
     TLBI IPAS2E1,X6
     DSB SY
     ERET
 L0:
+    STR X2,[X3]
     LDR X4,[X5]
 """
 

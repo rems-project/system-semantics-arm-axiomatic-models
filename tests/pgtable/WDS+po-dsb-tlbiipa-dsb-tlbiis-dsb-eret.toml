@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "CoWTf.inv.EL2+dsb-tlbiipa-dsb-tlbiis-dsb-eret"
+name = "WDS+po-dsb-tlbiipa-dsb-tlbiis-dsb-eret"
 symbolic = ["x"]
 
 page_table_setup = """
