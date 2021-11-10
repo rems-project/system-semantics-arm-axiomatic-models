@@ -48,4 +48,4 @@ R8 = "z"
 
 [final]
 expect = "sat"
-assertion = "1:X2=1 & 1:X4=0 & 1:X7 = 0"
+assertion = "1:X2=1 & 1:X4=0 & 1:X7=0"
