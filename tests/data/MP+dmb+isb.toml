@@ -1,0 +1,45 @@
+arch = "AArch64"
+name = "MP+dmb+isb"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1 pa2;
+
+    x |-> pa1;
+    *pa1 = 0;
+
+    y |-> pa2;
+    *pa2 = 0;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    DMB SY
+    STR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b1, 64)"
+R1 = "x"
+R2 = "extz(0b1, 64)"
+R3 = "y"
+
+[thread.1]
+init = {}
+code = """
+    LDR X2,[X1]
+    ISB
+    LDR X4,[X3]
+"""
+
+[thread.1.reset]
+R1 = "y"
+R3 = "x"
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[final]
+expect = "sat"
+assertion = "1:X2=1 & 1:X4=0"
