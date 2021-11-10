@@ -1,0 +1,52 @@
+arch = "AArch64"
+name = "CoRT.inv+addr-trfi"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1 pa2;
+    x |-> pa1;
+    y |-> invalid;
+    y ?-> pa2;
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+init = { }
+code = """
+    STR X0,[X1]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b1, 64)"
+R1 = "x"
+
+[thread.1]
+init = { }
+code = """
+    LDR X0,[X1]
+    EOR X2,X0,X0
+    STR X3,[X4,X2]
+    LDR X5,[X6]
+"""
+
+[thread.1.reset]
+R1 = "x"
+R3 = "mkdesc3(oa=pa2)"
+R4 = "pte3(y, page_table_base)"
+R6 = "y"
+"VBAR_EL1" = "extz(0x1000, 64)"
+
+[section.thread0_el1_handler]
+address = "0x1400"
+code = """
+    MOV X5,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+expect = "sat"
+assertion = "true"
