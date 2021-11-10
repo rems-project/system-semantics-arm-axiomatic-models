@@ -5,8 +5,9 @@ symbolic = ["x", "y"]
 page_table_setup = """
     physical pa1;
     x |-> pa1;
-    y |-> pa1;
     x ?-> invalid;
+    y |-> pa1;
+    *pa1 = 0;
     identity 0x1000 with code;
 """
 
