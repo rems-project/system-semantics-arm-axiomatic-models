@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "LB+data-trfis"
+name = "LB+addr-trfis"
 symbolic = ["x", "y", "u", "v"]
 
 page_table_setup = """
@@ -19,8 +19,7 @@ init = { }
 code = """
 	LDR X0,[X1]
 	EOR X2,X0,X0
-	ORR X3,X3,X2
-	STR X3,[X4]
+	STR X3,[X4,X2]
 	STR X5,[X6]
 """
 
@@ -49,8 +48,7 @@ init = { }
 code = """
 	LDR X0,[X1]
 	EOR X2,X0,X0
-	ORR X3,X3,X2
-	STR X3,[X4]
+	STR X3,[X4,X2]
 	STR X5,[X6]
 """
 
