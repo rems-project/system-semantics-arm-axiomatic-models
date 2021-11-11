@@ -1,3 +1,5 @@
+; Check for break-before-make violations
+; This is set of constraints is satisfiable iff there is a BBM violation
 (declare-const BBM_Wl0 Event)
 (declare-const BBM_Wl1 Event)
 (declare-const BBM_Wl2 Event)
@@ -50,7 +52,7 @@
 (define-fun valid_table_desc ((desc (_ BitVec 64))) Bool
    (= (bvand desc #x0000000000000011) #x0000000000000011))
 
-; For each level, if its valid its parent must be a valid table entry
+; For each level, if it is valid, then its parent must be a valid table entry
 (assert
   (and
     (implies (valid_desc BBM_Wl3_data) (valid_table_desc BBM_Wl2_data))
@@ -58,8 +60,8 @@
     (implies (valid_desc BBM_Wl1_data) (valid_table_desc BBM_Wl0_data))))
 
 ; If an entry is pointed to by its parent, then it must be actually
-; represent a valid page table write at the correct location. The
-; alternative is if the parent is invalid, in which case anything
+; represented by a valid page table write at the correct location.
+; The alternative is if the parent is invalid, in which case anything
 ; goes
 (assert
   (implies (valid_table_desc BBM_Wl0_data)
