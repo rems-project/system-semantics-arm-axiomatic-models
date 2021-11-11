@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "S.RTf.inv.EL1+dsb-tlbiis-dsb+poqp"
+name = "MP.RTf.inv.EL1+dsb-tlbiis-dsb+poqp"
 symbolic = ["x", "y", "z"]
 
 page_table_setup = """
@@ -37,12 +37,11 @@ R4 = "extz(page(x), 64)"
 init = {}
 code = """
     LDAPR X0,[X1]
-    STR X2,[X3]
+    LDR X2,[X3]
 """
 
 [thread.1.reset]
 R1 = "y"
-R2 = "extz(0b1, 64)"
 R3 = "x"
 VBAR_EL1 = "extz(0x1000, 64)"
 

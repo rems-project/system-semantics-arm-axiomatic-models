@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "S.RTf.inv.EL1+dsb-tlbiis-dsb+poqp"
+name = "S.RTf.inv.EL1+dsb-tlbiis-dsb+poap"
 symbolic = ["x", "y", "z"]
 
 page_table_setup = """
@@ -36,7 +36,7 @@ R4 = "extz(page(x), 64)"
 [thread.1]
 init = {}
 code = """
-    LDAPR X0,[X1]
+    LDAR X0,[X1]
     STR X2,[X3]
 """
 
@@ -62,4 +62,4 @@ code = """
 
 [final]
 expect = "sat"
-assertion = "1:X0 = 1 & 1:X2=0"
+assertion = "1:X0=1 & 1:X2=0"
