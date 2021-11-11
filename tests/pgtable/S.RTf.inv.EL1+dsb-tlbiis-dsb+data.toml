@@ -38,7 +38,7 @@ init = {}
 code = """
     LDR X0,[X1]
     EOR X4,X0,X0
-    ORR X2,X4,X4
+    ORR X2,X2,X4
     STR X2,[X3]
 """
 
