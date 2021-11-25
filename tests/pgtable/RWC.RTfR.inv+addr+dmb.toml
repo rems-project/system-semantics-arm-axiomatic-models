@@ -5,11 +5,12 @@ symbolic = ["x", "y", "z"]
 page_table_setup = """
     physical pa1 pa2;
     x |-> pa1;
+    *pa1 = 0;
 
     y |-> invalid;
     y ?-> pa2;
     z |-> pa2;
-    *pa1 = 1;
+    *pa2 = 1;
 
     identity 0x1000 with code;
     identity 0x2000 with code;
