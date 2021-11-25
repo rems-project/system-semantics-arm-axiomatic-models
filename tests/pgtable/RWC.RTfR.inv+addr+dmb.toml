@@ -76,4 +76,4 @@ VBAR_EL1 = "extz(0x2000, 64)"
 
 [final]
 expect = "sat"
-assertion = "1:X1=1 & 1:X3=0 & 2:X2=0"
+assertion = "1:X0=1 & 1:X3=0 & 2:X2=0"
