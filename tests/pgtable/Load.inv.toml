@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "R.inv"
+name = "Load.inv"
 symbolic = ["x"]
 
 page_table_setup = """
