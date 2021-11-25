@@ -41,7 +41,7 @@ ELR_EL1 = "L0:"
 TTBR0_EL1 = "ttbr(asid=0x00, base=table0)"
 
 [section.thread0_el1_handler]
-address = "0x1400"
+address = "0x1200"
 code = """
     MOV X1,#1
 
