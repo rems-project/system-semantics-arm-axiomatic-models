@@ -31,6 +31,7 @@ L0:
 
 [thread.0.reset]
 R0 = "ttbr(asid=0x00, base=table1)"
+R1 = "extz(0b0, 64)"
 R2 = "x"
 VBAR_EL1 = "extz(0x1000, 64)"
 "PSTATE.EL" = "0b01"
