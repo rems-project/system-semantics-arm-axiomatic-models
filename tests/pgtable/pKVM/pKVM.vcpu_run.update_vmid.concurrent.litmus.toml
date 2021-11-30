@@ -36,7 +36,9 @@ s2table vm2_stage2 0x380000  {
     }
 }
 
+*pa1 = 0;
 *pa2 = 1;
+*pa_ipi = 0;
 *pa_kvm_vmid_lock = 1;
 """
 
@@ -56,8 +58,8 @@ code = """
 """
 
 [thread.0.reset]
-R0 = "extz(0b1, 64)"
-R1 = "kvm_vmid_lock"
+R0 = "extz(0b1, 64)" # for the HVC
+R1 = "kvm_vmid_lock" # for the HVC
 
 R2 = "extz(0b1, 64)"
 R3 = "ipi"
@@ -73,7 +75,7 @@ TTBR0_EL2 = "ttbr(asid=0x0000, base=hyp_map)"
 [thread.1]
 init = {}
 code = """
-    LDR X0,[X1]  // in guest, read X
+    LDR X0,[X1]  // in guest, read x
     DSB SY
     ISB
     HVC #0       // fake IPI
@@ -81,14 +83,14 @@ code = """
 """
 
 [thread.1.reset]
-"R1" = "x"
-"R3" = "x"
-"R5" = "ipi"
-"R6" = "extz(0b10, 64)"
-"R7" = "ipi"
-"R9" = "kvm_vmid_lock"
-"R10" = "ttbr(asid=0x0000, base=vm2_stage1)"
-"R11" = "ttbr(vmid=0x0001, base=vm2_stage2)" # re-use VMID
+R1 = "x"
+R3 = "x"
+R5 = "ipi"
+R6 = "extz(0b10, 64)"
+R7 = "ipi"
+R9 = "kvm_vmid_lock"
+R10 = "ttbr(asid=0x0000, base=vm2_stage1)"
+R11 = "ttbr(vmid=0x0001, base=vm2_stage2)" # re-use VMID
 
 TTBR0_EL2 = "ttbr(asid=0x0000, base=hyp_map)"
 VTTBR_EL2 = "ttbr(vmid=0x0001, base=vm1_stage2)"
@@ -100,7 +102,7 @@ VBAR_EL2 = "extz(0x1000, 64)"
 [section.thread1_el2_handler]
 address = "0x1400" # 0x400 - Lower Exception Level
 code = """
-    LDR X4,[X5] // smb recieve
+    LDR X4,[X5] // smb receive
     STR X6,[X7] // smb reply
 
     LDAR X8,[X9] // kvm/hyp/include/nvhe/spinlock.h
