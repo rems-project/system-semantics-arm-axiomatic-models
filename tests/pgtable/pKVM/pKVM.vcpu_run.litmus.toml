@@ -29,51 +29,56 @@ s2table vm2_stage2 0x280000 {
   ipa2 |-> pa2;
   s1table vm2_stage1;
 }
-*pa2 = 1;
+*pa1 = 1;
+*pa2 = 2;
 """
 
 [thread.0]
 code = """
-    MSR TTBR0_EL1,X0 // kvm/hyp/sysreg-sr.h:96
-    MSR VTTBR_EL2,X1 // include/asm/kvm_mmu.h:276
-    ERET              // kvm/hyp/nvhe/host.S
-  L0:
-    LDR X2,[X3] // in guest
+  MOV X0,#0
+  LDR X0,[X1] // in guest
+  HVC #0x0
+  MOV X4,#0
+  LDR X4,[X5] // in guest
 """
-
-[thread.0.reset]
-R0 = "ttbr(asid=0x00, base=vm2_stage1)"
-R1 = "ttbr(vmid=0x0002, base=vm2_stage2)"
-TTBR0_EL2 = "ttbr(asid=0x00, base=hyp_map)"
-VTTBR_EL2 = "ttbr(vmid=0x0001, base=vm1_stage2)"
-TTBR0_EL1 = "ttbr(asid=0x00, base=vm1_stage1)"
-R3 = "x"
-VBAR_EL2 = "extz(0x1000, 64)"
-"PSTATE.EL" = "0b10"
-
-# make ERET return to EL1h at L0
-SPSR_EL2 = "extz(0b00101, 64)"
-ELR_EL2 = "extz(L0:, 64)"
 
 [section.thread0_el2_handler]
 address = "0x1400" # 0x400 - Lower Exception Level
 code = """
-    MOV X2,#0
-    
-    MRS X20,ELR_EL2
-    ADD X20,X20,#4
-    MSR ELR_EL2,X20
-    ERET
+  MRS X13, ESR_EL2
+  // read ESR_EL2.EC
+  UBFX X13, X13, #26, #5
+  // if EC==HVC (010110)
+  SUBS X13, X13, 0b010110
+  // Branch to HVC handle
+  CBZ X13, 2f
+
+// EC==DABT
+1:
+  MOV X4,#0
+  MRS X20,ELR_EL2
+  ADD X20,X20,#4
+  MSR ELR_EL2,X20
+  ERET
+
+// EC=HVC
+2:
+  MSR TTBR0_EL1,X2 // kvm/hyp/sysreg-sr.h:96
+  MSR VTTBR_EL2,X3 // include/asm/kvm_mmu.h:276
+  ERET              // kvm/hyp/nvhe/host.S
 """
 
-[final]
-assertion = "0:X2=0"
+[thread.0.reset]
+R1 = "x"
+R2 = "ttbr(asid=0x00, base=vm2_stage1)"
+R3 = "ttbr(vmid=0x0002, base=vm2_stage2)"
+TTBR0_EL2 = "ttbr(asid=0x00, base=hyp_map)"
+VTTBR_EL2 = "ttbr(vmid=0x0001, base=vm1_stage2)"
+TTBR0_EL1 = "ttbr(asid=0x00, base=vm1_stage1)"
+R5 = "x"
+VBAR_EL2 = "extz(0x1000, 64)"
 
-[graph]
-force_show_events = [
-    "T0:3:s2l3",
-]
-shows = [
-    "iio",
-    "po",
-]
+"PSTATE.EL" = "0b01"
+
+[final]
+assertion = "0:X0=1 & ~(0:X4=2)"
