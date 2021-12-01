@@ -41,6 +41,7 @@ code = """
     LDR X0,[X1]
     DSB SY
     ISB
+    MOV X2,#1
     LDR X2,[X3]
 """
 
@@ -53,8 +54,6 @@ VBAR_EL2 = "extz(0x2000, 64)"
 [section.thread1_el1_handler]
 address = "0x2400"
 code = """
-    MOV X2,#1
-
     MRS X13,ELR_EL2
     ADD X13,X13,#4
     MSR ELR_EL2,X13
@@ -62,4 +61,4 @@ code = """
 """
 
 [final]
-assertion = "true"
+assertion = "1:X0=1 & 1:X2=0"
