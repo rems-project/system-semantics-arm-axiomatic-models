@@ -102,12 +102,12 @@ let same-vmid = tlbi-to-vmid-read; [read_VMID]; same-translation
 let same-asid = tlbi-to-asid-read; [read_ASID]; same-translation
 
 (* A TLBI barriers some writes, making them unobservable to "future" reads from a translation table walk.
-  *
-  * tseq1 relates writes with TLBIs that ensure their visibility
-  * e.g.  `a: Wpte(x) ; b: Wpte(x) ; c: Wpte(x) ; d: TLBI x`
-  *  then `c ; tseq1 ; d`
-  *  as a, b are no longer visible to translation table walks
-  *)
+ *
+ * tseq1 relates writes with TLBIs that ensure their visibility
+ * e.g.  `a: Wpte(x) ; b: Wpte(x) ; c: Wpte(x) ; d: TLBI x`
+ *  then `c ; tseq1 ; d`
+ *  as a, b are no longer visible to translation table walks
+ *)
 let tlb_might_affect =
     [ TLBI-S1 & ~TLBI-S2 &  TLBI-VA  &  TLBI-ASID & TLBI-VMID] ; (same-va-page & same-asid & same-vmid) ; [T & Stage1]
   | [ TLBI-S1 & ~TLBI-S2 & ~TLBI-VA  &  TLBI-ASID & TLBI-VMID] ; (same-asid & same-vmid) ; [T & Stage1]
@@ -153,12 +153,13 @@ let tob =
   | speculative ; trfi
 
 (* S1 translations must occur before S1 invalidations
-* which would make the translation unobservable
-* and also before any S1 invalidations that would make
-* the subsequent S2 translation illegal *)
+ * which would make the translation unobservable
+ * and also before any S1 invalidations that would make
+ * the subsequent S2 translation illegal *)
 let obtlbi_translate =
     tcache1
-  (* if the S2 translation is ordered before some S2 write
+  (* 
+   * if the S2 translation is ordered before some S2 write
    * then the S1 translation has to be ordered before the subsequent
    * S1 invalidate which would force the S2 write to be visible
    *
@@ -166,21 +167,29 @@ let obtlbi_translate =
    * here the Stage2 translation is only complete once the TLBI VA which
    * invalidates previous translation-table-walks have been complete
    *
-   * if the S1 translations are from before the TLBI VA,
-   * then the S2 translation is ordered after the TLBI VA
-   *
-   * if the S1 translations are from after the TLBI VA
+   * if the S1 translation is from after the TLBI VA
    * then the S2 translation is only ordered after the TLBI IPA
    *)
   | tcache2 & (same-translation ; [T & Stage1] ; trf^-1 ; wco^-1)
+  (*
+   * if the S1 translation is from before the TLBI VA,
+   * then the S2 translation is ordered after the TLBI VA
+   *)
   | (tcache2 ; wco? ; [TLBI-S1]) & (same-translation ; [T & Stage1] ; maybe_TLB_cached)
 
-(* ordered-before TLBI *)
+(* ordered-before-TLBI *)
 let obtlbi =
     obtlbi_translate
+  (*
+   * a TLBI ensures all instructions that use the old translation
+   * and their respective memory events
+   * are ordered before the TLBI.
+   *)
   | [R|W|Fault] ; iio^-1 ; (obtlbi_translate & ext)
 
 (* context-change ordered-before *)
+(* note that this is under-approximate and future work is needed
+ * on exceptions and context-changing operations in general *)
 let ctxob =
  (* no speculating past context-changing operations *)
     speculative ; [MSR]
@@ -188,6 +197,7 @@ let ctxob =
   | [CSE] ; instruction-order
  (* context-synchronization acts as a barrier for context-changing operations *)
   | [ContextChange] ; po ; [CSE]
+ (* context-synchronization-events cannot happen speculatively *)
   | speculative ; [CSE]
 
 (* ordered-before a translation fault *)
