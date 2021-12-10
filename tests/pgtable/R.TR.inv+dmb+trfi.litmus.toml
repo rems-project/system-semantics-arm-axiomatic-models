@@ -1,0 +1,66 @@
+arch = "AArch64"
+name = "R.TR.inv+dmb+trfi"
+symbolic = ["w", "x", "y"]
+
+page_table_setup = """
+    physical pa1;
+    w |-> invalid;
+    w ?-> pa1;
+    x |-> pa1;
+    *pa1 = 0;
+
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    DMB SY
+    STR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0x2, 64)"
+R1 = "x"
+R2 = "extz(0x0, 64)"
+R3 = "pte3(w, page_table_base)"
+
+[thread.1]
+init = {}
+code = """
+    STR X0,[X1]
+    MOV X2,#1
+    LDR X2,[X3]
+"""
+
+[thread.1.reset]
+R0 = "mkdesc3(oa=pa1)"
+R1 = "pte3(w, page_table_base)"
+R3 = "w"
+VBAR_EL1 = "extz(0x1000, 64)"
+
+"PSTATE.SP" = "0b0"
+"PSTATE.EL" = "0b00"
+
+[section.thread1_el1_handler]
+address = "0x1400"
+code = """
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[thread.2]
+init = {}
+code = """
+    LDR X0,[X1]
+    LDR X2,[X1]
+"""
+
+[thread.2.reset]
+R1 = "pte3(w, page_table_base)"
+
+[final]
+assertion = "1:X2=0 & 2:X0=0 & 2:X2=mkdesc3(oa=pa1)"

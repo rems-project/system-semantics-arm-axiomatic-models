@@ -1,0 +1,49 @@
+arch = "AArch64"
+name = "MP+tlbiall+po-addr"
+symbolic = ["x", "y", "z"]
+
+page_table_setup = """
+    physical pa1 pa2 pa3;
+    x |-> pa1;
+    y |-> pa2;
+    z |-> pa3;
+
+    *pa1 = 0;
+    *pa2 = 0;
+    *pa3 = 0;
+"""
+
+[thread.0]
+init = {}
+code = """
+    MOV X0, #1
+    STR X0,[X1]
+    DSB SY
+    TLBI VMALLE1IS
+    DSB SY
+    MOV X2, #1
+    STR X2,[X3]
+"""
+
+[thread.0.reset]
+R1 = "x"
+R3 = "y"
+
+"PSTATE.EL" = "0b01"
+
+[thread.1]
+init = {}
+code = """
+    LDR X0,[X1]
+    LDR X2,[X3]
+    EOR X6,X2,X2
+    LDR X4,[X5,X6]
+"""
+
+[thread.1.reset]
+R1 = "y"
+R3 = "z"
+R5 = "x"
+
+[final]
+assertion = "1:X0=1 & 1:X4=0"
