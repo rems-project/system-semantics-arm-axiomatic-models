@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "S.TR+tlbiall+po"
+name = "S+tlbiall+po"
 symbolic = ["x", "y"]
 
 page_table_setup = """
