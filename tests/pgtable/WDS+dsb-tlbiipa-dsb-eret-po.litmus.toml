@@ -6,11 +6,11 @@ page_table_setup = """
     physical pa1;
     intermediate ipa1;
 
-    x |-> ipa1;
-    x ?-> invalid;
+    x |-> invalid;
+    x ?-> ipa1;
 
-    ipa1 |-> pa1;
-    ipa1 ?-> invalid;
+    ipa1 |-> invalid;
+    ipa1 ?-> pa1;
 
     *pa1 = 0;
 
@@ -32,9 +32,9 @@ L0:
 """
 
 [thread.0.reset]
-R0 = "extz(0b0, 64)"
+R0 = "mkdesc3(oa=pa1)"
 R1 = "pte3(ipa1, s2_page_table_base)"
-R2 = "extz(0b0, 64)"
+R2 = "mkdesc3(oa=ipa1)"
 R3 = "pte3(x, page_table_base)"
 R5 = "x"
 R6 = "extz(page(x), 64)"
@@ -68,4 +68,4 @@ code = """
 """
 
 [final]
-assertion = "0:X4 = 0"
+assertion = "0:X4=2"
