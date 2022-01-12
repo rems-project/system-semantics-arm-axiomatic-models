@@ -128,7 +128,7 @@ let tlb_affects =
  * which the TLBI threw away
  *)
 let maybe_TLB_cached =
-  (trf^-1 ; wco ; [TLBI-S1]) & tlb_affects^-1
+  ([W] ; trf^-1 ; wco ; [TLBI-S1]) & tlb_affects^-1
 
 (* squash tseq and maybe_TLB_barriered together
  * now we have t TLB_barrier tlbi iff the tlbi hides t *)
@@ -185,7 +185,7 @@ let obtlbi =
    * and their respective memory events
    * are ordered before the TLBI.
    *)
-  | [R|W|Fault] ; iio^-1 ; (obtlbi_translate & ext)
+  | [R|W|Fault] ; iio^-1 ; (obtlbi_translate & ext) ; [TLBI]
 
 (* context-change ordered-before *)
 (* note that this is under-approximate and future work is needed
