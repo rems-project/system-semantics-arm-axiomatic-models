@@ -125,7 +125,7 @@ let tlb_might_affect =
   | (            TLBI-S2 & ~TLBI-IPA & ~TLBI-ASID & ~TLBI-VMID) * (T & Stage2)
   | (TLBI-ALL * T)
 
-let tlb_affects =
+let tlb-affects =
     [TLBI-IS] ; tlb_might_affect
   | ([~TLBI-IS] ; tlb_might_affect) & int
 
@@ -134,11 +134,11 @@ let tlb_affects =
  * which the TLBI threw away
  *)
 let maybe_TLB_cached =
-  ([W] ; trf^-1 ; wco ; [TLBI-S1]) & tlb_affects^-1
+  ([W] ; trf^-1 ; wco ; [TLBI-S1]) & tlb-affects^-1
 
 (* squash tseq and maybe_TLB_barriered together
  * now we have t TLB_barrier tlbi iff the tlbi hides t *)
-let _TLB_barrier = ([TLBI] ; tlb_affects ; [T] ; tfr ; [W])^-1
+let _TLB_barrier = ([TLBI] ; tlb-affects ; [T] ; tfr ; [W])^-1
 let TLB_barrier = _TLB_barrier & wco
 
 let tcache1 = [T & Stage1] ; tfr ; TLB_barrier
