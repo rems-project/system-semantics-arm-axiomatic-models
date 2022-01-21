@@ -87,6 +87,12 @@ let _addr =
   | tdata ; [T_f]
 *)
 
+(* CSEs are context-synchronization-events
+ * that is an ISB, and taking/returning from an exception *)
+(*
+let CSE = ISB | TE | ERET
+*)
+
 (* fault events come from reads or writes *)
 let Fault = TE  (* TakeException, this is overly general *)
 let IsFromR = Fault
