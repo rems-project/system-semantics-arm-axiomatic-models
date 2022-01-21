@@ -34,8 +34,8 @@ let bob = [R] ; po ; [dmbld]
   | [dsb] ; po
 
 (* Ordered-before *)
-let _ob = obs | dob | aob | bob | iio | tob | obtlbi | ctxob | obfault
-let ob = _ob^+
+let ob1 = obs | dob | aob | bob | iio | tob | obtlbi | ctxob | obfault
+let ob = ob1^+
 
 (* Internal visibility requirement *)
 acyclic po-loc | fr | co | rf as internal
