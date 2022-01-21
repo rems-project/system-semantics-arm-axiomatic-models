@@ -218,8 +218,12 @@ let obfault =
 (* if FEAT_ETS then if E1 is ordered-before some Fault
  * then E1 is ordered-before the translation-table-walk read which generated that fault
  * (but not *every* read from the walk, only the one that directly led to the translation fault)
+ *
+ * Additionally, if ETS then TLBIs are guaranteed completed after DSBs
+ * hence po-later translations must be ordered after the TLBI (D5.10.2)
  *)
 let obETS =
     (obfault ; [Fault]) ; iio^-1 ; [T_f]
+  | ([TLBI] ; po ; [dsb] ; instruction-order ; [T]) & tlb-affects
 
 include "shows.cat"
