@@ -23,15 +23,15 @@ let aob = rmw
   | [range(rmw)]; rfi; [A | Q]
 
 (* barrier-ordered-before *)
-let bob = [dmb]; po; [R | W]
+let bob = [R] ; po ; [dmbld]
+  | [W] ; po ; [dmbst]
+  | [dmbst]; po; [W]
+  | [dmbld]; po; [R|W]
   | [L]; po; [A]
   | [A | Q]; po; [R | W]
   | [R | W]; po; [L]
-  | [R] ; po ; [dmbld]
-  | [W] ; po ; [dmbst]
-  | [R | W] ; po ; [dmbsy]
-  | [R | W | F | C]; po; [dsbsy]
-  | [dsb]; po; [R | W | F | C]
+  | [F | C]; po; [dsbsy]
+  | [dsb] ; po
 
 (* Ordered-before *)
 let _ob = obs | dob | aob | bob | iio | tob | obtlbi | ctxob | obfault | obETS

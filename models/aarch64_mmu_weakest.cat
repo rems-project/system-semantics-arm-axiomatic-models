@@ -14,18 +14,16 @@ let dob = addr | data
 let aob = rmw
   | [range(rmw)]; rfi; [A | Q]
 
-let bob = [R | W]; po; [DMB.SY]
-  | [DMB.SY]; po; [R | W]
+(* barrier-ordered-before *)
+let bob = [R] ; po ; [dmbld]
+  | [W] ; po ; [dmbst]
+  | [dmbst]; po; [W]
+  | [dmbld]; po; [R|W]
   | [L]; po; [A]
-  | [R]; po; [DMB.LD]
-  | [DMB.LD]; po; [R | W]
   | [A | Q]; po; [R | W]
-  | [W]; po; [DMB.ST]
-  | [DMB.ST]; po; [W]
   | [R | W]; po; [L]
-  | [R | W | F | C]; po; [dsbsy]
-  | [dsb]; po; [R | W | F | C]
-  | [DMB.SY]; po; [DC]
+  | [F | C]; po; [dsbsy]
+  | [dsb] ; po
 
 (* Ordered-before *)
 let ob = (obs | dob | aob | bob)^+
