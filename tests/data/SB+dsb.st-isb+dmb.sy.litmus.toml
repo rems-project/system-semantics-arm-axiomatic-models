@@ -1,0 +1,43 @@
+arch = "AArch64"
+name = "SB+dsb.st-isb+dmb.sy"
+symbolic = ["x", "y"]
+
+page_table_setup = """
+    physical pa1 pa2;
+
+    x |-> pa1;
+    *pa1 = 0;
+
+    y |-> pa2;
+    *pa2 = 0;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X0,[X1]
+    DSB ST
+    ISB
+    LDR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0b1, 64)"
+R1 = "x"
+R3 = "y"
+
+[thread.1]
+init = {}
+code = """
+    STR X0,[X1]
+    DMB SY
+    LDR X2,[X3]
+"""
+
+[thread.1.reset]
+R0 = "extz(0b1, 64)"
+R1 = "y"
+R3 = "x"
+
+[final]
+assertion = "0:X2=0 & 1:X2=0"
