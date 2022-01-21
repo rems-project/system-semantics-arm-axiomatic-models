@@ -123,7 +123,7 @@ let tlb_might_affect =
   | [ TLBI-S1 &  TLBI-S2 & ~TLBI-IPA & ~TLBI-ASID & TLBI-VMID] ; same-vmid ; [T]
   | ( TLBI-S1 &            ~TLBI-IPA & ~TLBI-ASID & ~TLBI-VMID) * (T & Stage1)
   | (            TLBI-S2 & ~TLBI-IPA & ~TLBI-ASID & ~TLBI-VMID) * (T & Stage2)
-  | (TLBI-ALL * T)
+(*  | (TLBI-ALL * T) *)
 
 let tlb-affects =
     [TLBI-IS] ; tlb_might_affect
