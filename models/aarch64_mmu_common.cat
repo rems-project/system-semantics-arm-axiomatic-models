@@ -93,6 +93,11 @@ let _addr =
 let CSE = ISB | TE | ERET
 *)
 
+(* Context changing operations
+ * are those that write to system registers
+ *)
+let ContextChange = MSR | TE | ERET
+
 (* fault events come from reads or writes *)
 let Fault = TE  (* TakeException, this is overly general *)
 let IsFromR = Fault
@@ -134,54 +139,39 @@ let tlb-affects =
  * which the TLBI threw away
  *)
 let maybe_TLB_cached =
-  ([W] ; trf^-1 ; wco ; [TLBI-S1]) & tlb-affects^-1
-
-(* squash tseq and maybe_TLB_barriered together
- * now we have t TLB_barrier tlbi iff the tlbi hides t *)
-let _TLB_barrier = ([TLBI] ; tlb-affects ; [T] ; tfr ; [W])^-1
-let TLB_barrier = _TLB_barrier & wco
-
-let tcache1 = [T & Stage1] ; tfr ; TLB_barrier
-let tcache2 = [T & Stage2] ; tfr ; TLB_barrier
-
-let ContextChange = MSR | ERET
+  ([T] ; trf^-1 ; wco ; [TLBI-S1]) & tlb-affects^-1
 
 (* translation-ordered-before *)
 let tob =
   (* a faulting translation must read from flat memory or newer *)
-    [T_f] ; tfre
-  (* if a faulting translation read from flat memory, but there was a po-previous DSB then we
-   * must be guaranteed to read from _that_ write or something newer *)
-  | ([T_f] ; tfri) & (po ; [dsbst] ; instruction-order)^-1
-  (* the W can only go ahead once the address of po-previous R/W have been confirmed *)
-  | [T] ; iio ; [R|W] ; po ; [W]
+    [T_f] ; tfr
   (* no forwarding from speculative writes *)
   | speculative ; trfi
 
-(* S1 translations must occur before S1 invalidations
- * which would make the translation unobservable
- * and also before any S1 invalidations that would make
- * the subsequent S2 translation illegal *)
+let tlb_barriered =
+  ([T] ; tfr ; wco ; [TLBI]) & tlb-affects^-1
+
 let obtlbi_translate =
-    tcache1
-  (* 
-   * if the S2 translation is ordered before some S2 write
+  (* A S1 translation must read from TLB/memory before the TLBI which
+   * invalidates that entry happens *)
+  [T & Stage1] ; tlb_barriered ; [TLBI-S1]
+  (* if the S2 translation is ordered before some S2 write
    * then the S1 translation has to be ordered before the subsequent
    * S1 invalidate which would force the S2 write to be visible
    *
    * this applies to S2 translations during a S1 walk as well
    * here the Stage2 translation is only complete once the TLBI VA which
-   * invalidates previous translation-table-walks have been complete
-   *
-   * if the S1 translation is from after the TLBI VA
+   * invalidates previous translation-table-walks have been complete *)
+  (* if the S1 translation is from after the TLBI VA
    * then the S2 translation is only ordered after the TLBI IPA
    *)
-  | tcache2 & (same-translation ; [T & Stage1] ; trf^-1 ; wco^-1)
-  (*
-   * if the S1 translation is from before the TLBI VA,
+  | ([T & Stage2] ; tlb_barriered ; [TLBI-S2])
+     & (same-translation ; [T & Stage1] ; trf^-1 ; wco^-1)
+  (* if the S1 translation is from before the TLBI VA,
    * then the S2 translation is ordered after the TLBI VA
    *)
-  | (tcache2 ; wco? ; [TLBI-S1]) & (same-translation ; [T & Stage1] ; maybe_TLB_cached)
+  | (([T & Stage2] ; tlb_barriered ; [TLBI-S2]) ; wco? ; [TLBI-S1])
+    & (same-translation ; [T & Stage1] ; maybe_TLB_cached)
 
 (* ordered-before-TLBI *)
 let obtlbi =
