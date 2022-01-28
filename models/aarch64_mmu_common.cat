@@ -202,7 +202,8 @@ let ctxob =
 let obfault =
     data ; [Fault & IsFromW]
   | speculative ; [Fault & IsFromW]
-  | [dmb] ; po ; [Fault & (IsFromW | IsFromR)]
+  | [dmbst] ; po ; [Fault & IsFromW]
+  | [dmbld] ; po ; [Fault & (IsFromW | IsFromR)]
   | [A|Q] ; po ; [Fault & (IsFromW | IsFromR)]
   | [R|W] ; po ; [Fault & IsFromW & IsReleaseW]
 
