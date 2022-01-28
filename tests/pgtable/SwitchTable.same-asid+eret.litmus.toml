@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "SwitchTable.same-asid+eret.toml"
+name = "SwitchTable.same-asid+eret"
 symbolic = ["x"]
 
 page_table_setup = """
@@ -26,6 +26,7 @@ code = """
     MSR TTBR0_EL1,X0
     ERET
 L0:
+    MOV X1,#1
     LDR X1,[X2]
 """
 
@@ -43,8 +44,6 @@ TTBR0_EL1 = "ttbr(asid=0x00, base=table0)"
 [section.thread0_el1_handler]
 address = "0x1200"
 code = """
-    MOV X1,#1
-
     MRS X20,ELR_EL1
     ADD X20,X20,#4
     MSR ELR_EL1,X20

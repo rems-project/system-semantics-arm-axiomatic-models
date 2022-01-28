@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "SwitchTable.same-asid+eret.toml"
+name = "SwitchTable.same-asid+eret"
 symbolic = ["x"]
 
 page_table_setup = """
