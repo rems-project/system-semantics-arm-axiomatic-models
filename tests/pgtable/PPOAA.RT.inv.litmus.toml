@@ -1,0 +1,63 @@
+arch = "AArch64"
+name = "PPOAA.RT.inv"
+symbolic = ["w", "x", "y", "z"]
+
+page_table_setup = """
+    physical pa1 pa2 pa3;
+    w |-> pa1;
+    x |-> invalid;
+    x ?-> pa1;
+    y |-> pa2;
+    z |-> pa3;
+    *pa1 = 1;
+    *pa2 = 0;
+    *pa3 = 0;
+
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+code = """
+    STR X0,[X1]
+    DMB SY
+    STR X2,[X3]
+"""
+
+[thread.0.reset]
+R0 = "extz(0x1, 64)"
+R1 = "z"
+R2 = "extz(0x1, 64)"
+R3 = "y"
+
+[thread.1]
+code = """
+    LDR X0,[X1]
+    EOR X2,X0,X0
+    STR X3,[X4,X2]
+    LDR X6,[X5]
+    EOR X8,X6,X6
+    LDR X9,[X7,X8]
+"""
+
+[thread.1.reset]
+R1 = "y"
+R3 = "desc3(w,page_table_base)"
+R4 = "pte3(x,page_table_base)"
+R5 = "x"
+R7 = "z"
+VBAR_EL1 = "extz(0x1000, 64)"
+__isla_monomorphize_writes = "true"
+
+[section.thread1_el1_handler]
+address = "0x1400"
+code = """
+    MOV X6,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+assertion = "1:X0 = 1 & 1:X6 = 1 & 1:X9 = 0"
