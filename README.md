@@ -1,2 +1,4 @@
 # systems-isla-tests
-Isla-compatible systems-level litmus tests and models
+
+VMSA models and tooling extras
+Litmus tests at https://github.com/litmus-tests/litmus-tests-armv8a-system-vmsa
