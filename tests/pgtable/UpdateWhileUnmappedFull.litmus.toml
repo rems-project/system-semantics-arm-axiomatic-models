@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "UpdateWhileUnmapped"
+name = "UpdateWhileUnmappedFull"
 symbolic = ["x", "z"]
 
 page_table_setup = """
@@ -15,13 +15,12 @@ page_table_setup = """
       x |-> pa1;
       x ?-> pa2;
     };
+    identity 0x283000 with default;
 
-identity 0x283000 with default;
+    x |-> table(0x283000) at level 2;
+    x ?-> invalid at level 2;
 
-x |-> table(0x283000) at level 2;
-x ?-> invalid at level 2;
-
-identity 0x1000 with code;
+    identity 0x1000 with code;
 """
 
 [thread.0]
@@ -79,8 +78,4 @@ code = """
 """
 
 [final]
-#assertion = "1:X0=1 & 1:X2=1"
-assertion = "true"
-
-[types]
-x = "uint64_t"
+assertion = "1:X0 = 1 & 1:X2 = 1"

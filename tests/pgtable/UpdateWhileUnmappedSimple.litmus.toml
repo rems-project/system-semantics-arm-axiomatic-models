@@ -1,0 +1,54 @@
+arch = "AArch64"
+name = "UpdateWhileUnmappedSimple"
+symbolic = ["x", "z"]
+
+page_table_setup = """
+    physical pa1 pa2;
+    *pa1 = 1;
+    *pa2 = 2;
+
+    s1table new_table 0x280000 {
+      x |-> pa1;
+      x ?-> pa2;
+    };
+    identity 0x283000 with default;
+
+    x |-> invalid at level 2;
+    x ?-> table(0x283000) at level 2;
+
+    identity 0x1000 with code;
+"""
+
+[thread.0]
+init = {}
+code = """
+    STR X2, [X1]
+    DSB SY
+    STR X4, [X3]
+    DSB SY
+    LDR X6, [X5]
+"""
+
+[thread.0.reset]
+R1 = "pte3(x,new_table)"
+R2 = "mkdesc3(oa=pa2)"
+R3 = "pte2(x, page_table_base)"
+R4 = "mkdesc2(table=extz(0x283000,64))"
+R5 = "x"
+VBAR_EL1 = "extz(0x1000, 64)"
+"PSTATE.EL" = "0b00"
+
+[section.thread0_el1_handler]
+address = "0x1400"
+code = """
+    MOV X6,#0
+
+    MRS X13,ELR_EL1
+    ADD X13,X13,#4
+    MSR ELR_EL1,X13
+    ERET
+"""
+
+[final]
+assertion = "0:X6 = 1"
+
