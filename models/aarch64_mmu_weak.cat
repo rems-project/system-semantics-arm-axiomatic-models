@@ -24,7 +24,7 @@ let bob = [R] ; po ; [dmbld]
   | [A | Q]; po; [R | W]
   | [R | W]; po; [L]
   | [F | C]; po; [dsbsy]
-  | [dsb] ; po
+  | [dsb.sy] ; po
   | [CSE] ; instruction-order
 
 (* Ordered-before *)
@@ -45,40 +45,40 @@ acyclic (po-pa | trfi) as translation-internal
 (* break-before-make S1 *)
 empty
   ([is_IW | W_invalid] ; co ; [W_valid] ; ob ; [CSE] ; instruction-order ; [T & Stage1])
-  & (ob ; [dsb] ; po ; ([TLBI-S1] ; po ; [dsb] ; ob ; [CSE] ; instruction-order ; [T]) & tlb_affects)
+  & (ob ; [dsb.sy] ; po ; ([TLBI-S1] ; po ; [dsb.sy] ; ob ; [CSE] ; instruction-order ; [T]) & tlb-affects)
   & trf & loc
   as bbm
 
 (* break S1 *)
-empty ([is_IW | W] ; co ; [W_invalid] ; ob ; [dsb] ; po
-      ; ([TLBI-S1] ; po ; [dsb] ; ob ; [M]; iio^-1; [T]) & tlb_affects & ext
+empty ([is_IW | W] ; co ; [W_invalid] ; ob ; [dsb.sy] ; po
+      ; ([TLBI-S1] ; po ; [dsb.sy] ; ob ; [M]; iio^-1; [T]) & tlb-affects & ext
       ) & trf & loc
       as brk1
 
-empty ([is_IW | W] ; co ; [W_invalid] ; ob ; [dsb] ; po
-      ; ([TLBI-S1] ; po ; [dsb] ; ob ; [CSE] ; instruction-order ; [T]) & tlb_affects
+empty ([is_IW | W] ; co ; [W_invalid] ; ob ; [dsb.sy] ; po
+      ; ([TLBI-S1] ; po ; [dsb.sy] ; ob ; [CSE] ; instruction-order ; [T]) & tlb-affects
       ) & trf & loc
       as brk2
 
 (* break-before-make S2 *)
 empty
   ([is_IW | W_invalid] ; co ; [W_valid] ; ob ; [CSE] ; instruction-order ; [T & Stage2])
-  & (ob ; [dsb] ; po
-    ; ([TLBI-S2] ; po ; [dsb]
-      ; ([TLBI-S1] ; po ; [dsb] ; ob ; [CSE]; instruction-order; [T]) & tlb_affects
-      ; iio ; [T]) & tlb_affects)
+  & (ob ; [dsb.sy] ; po
+    ; ([TLBI-S2] ; po ; [dsb.sy]
+      ; ([TLBI-S1] ; po ; [dsb.sy] ; ob ; [CSE]; instruction-order; [T]) & tlb-affects
+      ; iio ; [T]) & tlb-affects)
   & trf & loc
     as bbms2
 
 (* break S2 *)
-empty ([is_IW | W] ; co ; [W_invalid] ; ob ; [dsb] ; po
-      ; ([TLBI-S2] ; po ; [dsb] ; po ; ([TLBI-S1] ; po ; [dsb] ; ob ; [M]; iio^-1; [T]) & tlb_affects & ext
-      ; iio ; [T]) & tlb_affects & ext
+empty ([is_IW | W] ; co ; [W_invalid] ; ob ; [dsb.sy] ; po
+      ; ([TLBI-S2] ; po ; [dsb.sy] ; po ; ([TLBI-S1] ; po ; [dsb.sy] ; ob ; [M]; iio^-1; [T]) & tlb-affects & ext
+      ; iio ; [T]) & tlb-affects & ext
       ) & trf & loc
       as brk1s2
 
-empty ([is_IW | W] ; co ; [W_invalid] ; ob ; [dsb] ; po
-      ; ([TLBI-S2] ; po ; [dsb] ; po ; ([TLBI-S1] ; po ; [dsb] ; ob ; [CSE]; instruction-order; [T]) & tlb_affects
-      ; iio ; [T]) & tlb_affects
+empty ([is_IW | W] ; co ; [W_invalid] ; ob ; [dsb.sy] ; po
+      ; ([TLBI-S2] ; po ; [dsb.sy] ; po ; ([TLBI-S1] ; po ; [dsb.sy] ; ob ; [CSE]; instruction-order; [T]) & tlb-affects
+      ; iio ; [T]) & tlb-affects
       ) & trf & loc
       as brk2s2
