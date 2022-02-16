@@ -46,11 +46,11 @@ acyclic (po-pa | trfi) as translation-internal
 empty
   ([is_IW | W_invalid]
    ; ob ;
-   [dsb.sy]
+   [dsbsy]
    ; po ;
    ([TLBI-S1]
     ; po ;
-    [dsb.sy]
+    [dsbsy]
     ; ob ;
     [W_valid]
     ; ob ;
@@ -75,17 +75,17 @@ empty ([is_IW | W] ; co ; [W_invalid] ; ob ; [dsbsy] ; po
 empty
   ([is_IW | W_invalid]
    ; ob ;
-   [dsb.sy]
+   [dsbsy]
    ; po ;
    ([TLBI-S2]
     ; po ;
-    [dsb.sy]
+    [dsbsy]
     ; ob? ;
-    [dsb.sy]
+    [dsbsy]
     ; po ;
     ([TLBI-S1]
      ; po ;
-     [dsb.sy]
+     [dsbsy]
      ; ob ;
      [W_valid]
      ; ob ;
