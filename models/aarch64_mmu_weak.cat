@@ -45,7 +45,7 @@ acyclic (po-pa | trfi) as translation-internal
 (* break-before-make S1 *)
 empty
   ([is_IW | W_invalid] ; co ; [W_valid] ; ob ; [CSE] ; instruction-order ; [T & Stage1])
-  & (ob ; [dsb] ; po ; ([TLBI-S1] ; po ; [dsb] ; ob ; [CSE] ; [T]) & tlb_affects)
+  & (ob ; [dsb] ; po ; ([TLBI-S1] ; po ; [dsb] ; ob ; [CSE] ; instruction-order ; [T]) & tlb_affects)
   & trf & loc
   as bbm
 
