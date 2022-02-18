@@ -64,7 +64,7 @@ empty ([is_IW | W] ; co ; [W_invalid] ; ob ; [dsbsy] ; po
 empty
   ([is_IW | W_invalid] ; co ; [W_valid] ; ob ; [CSE] ; instruction-order ; [T & Stage2])
   & (ob ; [dsbsy] ; po
-    ; ([TLBI-S2] ; po ; [dsbsy]
+    ; ([TLBI-S2] ; po ; [dsbsy] ; po ;
       ; ([TLBI-S1] ; po ; [dsbsy] ; ob ; [CSE]; instruction-order; [T]) & tlb-affects
       ; iio ; [T]) & tlb-affects)
   & trf & loc
