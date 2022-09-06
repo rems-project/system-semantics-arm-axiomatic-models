@@ -144,9 +144,7 @@ let maybe_TLB_cached =
 (* translation-ordered-before *)
 let tob =
   (* a faulting translation must read from flat memory or newer *)
-    [T_f] ; tfre
-  (* cannot forward past a DSB *)
-  | ([T_f] ; tfri ; [W]) & (po ; [dsbst] ; instruction-order)^-1
+    [T_f] ; tfr
   (* no forwarding from speculative writes *)
   | speculative ; trfi
 
