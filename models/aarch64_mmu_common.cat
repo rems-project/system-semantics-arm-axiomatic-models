@@ -44,7 +44,7 @@ let speculative =
   | [T] ; instruction-order
 
 (* po-pa relates all events from instructions in instruction-order to the same PA *)
-let po-pa = instruction-order & loc
+let po-pa = (instruction-order | iio) & loc
 
 let trfi = trf & int
 let trfe = trf \ trfi
