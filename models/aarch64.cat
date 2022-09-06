@@ -3,7 +3,7 @@ include "cos.cat"
 include "barriers.cat"
 
 (* observed by *)
-let obs = rfe | fr | wco
+let obs = rfe | fr | co
 
 (* dependency-ordered-before *)
 let dob =
@@ -16,20 +16,17 @@ let aob = rmw
   | [range(rmw)]; rfi; [A | Q]
 
 (* barrier-ordered-before *)
-let bob = [R | W]; po; [DMBSY]
-  | [DMBSY]; po; [R | W]
+let bob = [R] ; po ; [dmbld]
+  | [W] ; po ; [dmbst]
+  | [dmbst]; po; [W]
+  | [dmbld]; po; [R|W]
   | [L]; po; [A]
-  | [R]; po; [DMBLD]
-  | [DMBLD]; po; [R | W]
   | [A | Q]; po; [R | W]
-  | [W]; po; [dmb.st]
-  | [dmb.st]; po; [W]
   | [R | W]; po; [L]
-  | [R | W | F | C]; po; [DSBSY]
-  | [DSBSY]; po; [R | W | F | C]
 
 (* Ordered-before *)
-let ob = (obs | dob | aob | bob)^+
+let ob1 = obs | dob | aob | bob
+let ob = ob1^+
 
 (* Internal visibility requirement *)
 acyclic po-loc | fr | co | rf as internal
