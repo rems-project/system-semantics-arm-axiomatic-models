@@ -1,0 +1,68 @@
+arch = "AArch64"
+name = "pKVM.hyp_access_own_memory"
+symbolic = []
+
+page_table_setup = """
+option default_tables = false;
+
+virtual x;
+physical pa1 pa2;
+intermediate ipa1 ipa2;
+
+s1table vm1_stage1 0x2C0000 {
+  x |-> ipa1;
+}
+s1table vm2_stage1 0x300000 {
+  x |-> ipa2;
+}
+s2table vm1_stage2 0x240000 {
+  ipa1 |-> pa1;
+  ipa2 |-> invalid;
+  s1table vm1_stage1;
+}
+s2table vm2_stage2 0x280000 {
+  ipa1 |-> invalid;
+  ipa2 |-> pa2;
+  s1table vm2_stage1;
+}
+s1table hyp_map 0x200000 {
+  identity 0x1000 with code;
+  x |-> invalid;
+  s2table vm1_stage2;
+  s2table vm2_stage2;
+}
+*pa1 = 1;
+*pa2 = 2;
+"""
+
+[thread.0]
+code = """
+  MOV X0,#0
+  STR X0,[X1]
+  MOV X2,#0
+  LDR X2,[X3]
+"""
+
+[section.thread0_el2_handler]
+address = "0x1200" # 0x200 - Lower Exception Level
+code = """
+  MRS X20,ELR_EL2
+  ADD X20,X20,#4
+  MSR ELR_EL2,X20
+  ERET
+"""
+
+[thread.0.reset]
+R1 = "x"
+R2 = "ttbr(asid=0x00, base=vm2_stage1)"
+R3 = "ttbr(vmid=0x0002, base=vm2_stage2)"
+TTBR0_EL2 = "ttbr(asid=0x00, base=hyp_map)"
+VTTBR_EL2 = "ttbr(vmid=0x0001, base=vm1_stage2)"
+TTBR0_EL1 = "ttbr(asid=0x00, base=vm1_stage1)"
+R5 = "x"
+VBAR_EL2 = "extz(0x1000, 64)"
+
+"PSTATE.EL" = "0b01"
+
+[final]
+assertion = "0:X0=1 & ~(0:X4=2)"
