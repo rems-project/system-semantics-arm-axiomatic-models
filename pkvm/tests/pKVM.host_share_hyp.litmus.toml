@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "pKVM.hyp_access_own_memory"
+name = "pKVM.host_share_hyp"
 symbolic = []
 
 page_table_setup = """
@@ -16,7 +16,7 @@ s1table vm2_stage1 0x300000 {
   x |-> ipa2;
 }
 s2table vm1_stage2 0x240000 {
-  ipa1 |-> invalid;
+  ipa1 |-> pa1;
   s1table vm1_stage1;
 }
 s2table vm2_stage2 0x280000 {
@@ -26,7 +26,8 @@ s2table vm2_stage2 0x280000 {
 s1table hyp_map 0x200000 {
   identity 0x1000 with code;
   identity 0x2000 with code;
-  x |-> pa1;
+  x |-> invalid;
+  x ?-> pa1;
   s2table vm1_stage2;
   s2table vm2_stage2;
 }
@@ -35,10 +36,11 @@ s1table hyp_map 0x200000 {
 
 [thread.0]
 code = """
+  // store to page to be shared
   MOV X0,#1
   STR X0,[X1]
-  MOV X2,#0
-  LDR X2,[X3]
+  // __pkvm_host_share_hyp
+  HVC #0x0
 """
 
 [section.thread0_el1_handler]
@@ -50,7 +52,23 @@ code = """
   ERET
 """
 
-[section.thread0_el2_handler]
+[section.thread0_el2_handler_lower_exc]
+address = "0x2400" # 0x400 - Lower Exception Level
+code = """
+  MRS X18,ELR_EL2
+  MRS X19,SPSR_EL2
+  STLR X2,[X3] // pgtable.c:396 smp_store_release(ptep, new);
+  DSB ISHST // pgtable.c:441 dsb(ishst);
+  ISB // pgtable.c:442 isb();
+  // worst-case scenario: tries to use `x` immediately.
+  MOV X4,#0
+  LDR X4,[X5]
+  MSR ELR_EL2,X18
+  MSR SPSR_EL2,X19
+  ERET
+"""
+
+[section.thread0_el2_handler_same_exc]
 address = "0x2200" # 0x200 - Same Exception Level (SP_ELx)
 code = """
   MRS X20,ELR_EL2
@@ -61,14 +79,16 @@ code = """
 
 [thread.0.reset]
 R1 = "x"
-R3 = "x"
+R2 = "mkdesc3(oa=pa1)"
+R3 = "pte3(x, hyp_map)"
+R5 = "x"
 TTBR0_EL2 = "ttbr(asid=0x00, base=hyp_map)"
 VTTBR_EL2 = "ttbr(vmid=0x0001, base=vm1_stage2)"
 TTBR0_EL1 = "ttbr(asid=0x00, base=vm1_stage1)"
 VBAR_EL2 = "extz(0x2000, 64)"
 
-"PSTATE.EL" = "0b10"
+"PSTATE.EL" = "0b01"
 "PSTATE.SP" = "0b1"
 
 [final]
-assertion = "~0:X2=1"
+assertion = "~0:X4=1"
