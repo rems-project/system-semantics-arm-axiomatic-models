@@ -42,6 +42,9 @@ code = """
   STR X0,[X1]
   // __pkvm_host_unshare_hyp
   HVC #0x0
+  // store once unshared
+  MOV X0,#2
+  STR X0,[X1]
 """
 
 [section.thread0_el1_handler]
@@ -121,4 +124,4 @@ code = """
 
 
 [final]
-assertion = "1:X0=1"
+assertion = "1:X0=2"
