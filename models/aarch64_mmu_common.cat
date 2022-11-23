@@ -102,6 +102,8 @@ let ContextChange = MSR | TE | ERET
 let Fault = TE  (* TakeException, this is overly general *)
 let IsTranslationFault = range([Fault] & (trf^-1 ; [W_invalid] ; trf))
 let IsPermissionFault = Fault & ~IsTranslationFault
+let Fault_T = Fault & IsTranslationFault
+let Fault_P = Fault & IsPermissionFault
 set IsFromR  (* events originating from an Arm LDR instruction *)
 set IsFromW  (* events originating from an Arm STR instruction *)
 set IsFromReleaseW  (* events originating from an Arm STLR instruction *)
@@ -199,12 +201,12 @@ let ctxob =
 
 (* ordered-before a translation fault *)
 let obfault =
-    data ; [IsTranslationFault & IsFromW]
-  | speculative ; [IsTranslationFault & IsFromW]
-  | [dmbst] ; po ; [IsTranslationFault & IsFromW]
-  | [dmbld] ; po ; [IsTranslationFault & (IsFromW | IsFromR)]
-  | [A|Q] ; po ; [IsTranslationFault & (IsFromW | IsFromR)]
-  | [R|W] ; po ; [IsTranslationFault & IsFromW & IsFromReleaseW]
+    data ; [Fault_T & IsFromW]
+  | speculative ; [Fault_T & IsFromW]
+  | [dmbst] ; po ; [Fault_T & IsFromW]
+  | [dmbld] ; po ; [Fault_T & (IsFromW | IsFromR)]
+  | [A|Q] ; po ; [Fault_T & (IsFromW | IsFromR)]
+  | [R|W] ; po ; [Fault_T & IsFromW & IsFromReleaseW]
 
 (* ETS-ordered-before *)
 (* if FEAT_ETS then if E1 is ordered-before some Fault
@@ -215,7 +217,7 @@ let obfault =
  * hence po-later translations must be ordered after the TLBI (D5.10.2)
  *)
 let obETS =
-    (obfault ; [IsTranslationFault]) ; iio^-1 ; [T_f]
+    (obfault ; [Fault_T]) ; iio^-1 ; [T_f]
   | ([TLBI] ; po ; [dsb] ; instruction-order ; [T]) & tlb-affects
 
 include "shows.cat"
