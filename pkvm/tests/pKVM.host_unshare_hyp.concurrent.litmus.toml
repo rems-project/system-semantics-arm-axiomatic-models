@@ -66,9 +66,6 @@ code = """
   TLBI VAE2IS,X6 // pgtable:477 __tlbi_level(vale2is, __TLBI_VADDR(addr, 0), level);
   DSB ISH // pgtable.c:481 dsb(ish);
   ISB // pgtable.c:482 isb();
-  // worst-case scenario: tries to use `x` immediately.
-  MOV X4,#0
-  LDR X4,[X5]
   MSR ELR_EL2,X18
   MSR SPSR_EL2,X19
   ERET
