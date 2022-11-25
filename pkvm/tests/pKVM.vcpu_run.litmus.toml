@@ -1,5 +1,5 @@
 arch = "AArch64"
-name = "pKVM.vcpu_run TODOTHISSTILLDOESNTWORK"
+name = "pKVM.vcpu_run"
 symbolic = []
 
 page_table_setup = """
@@ -9,21 +9,21 @@ virtual x;
 physical pa1 pa2;
 intermediate ipa1 ipa2;
 
-s1table host_stage1 0x200000 {
+s1table host_stage1 0x2C0000 {
   x |-> ipa1;
 }
-s1table guest1_stage1 0x240000 {
+s1table guest1_stage1 0x300000 {
   x |-> ipa2;
 }
-s2table host_stage2 0x280000 {
+s2table host_stage2 0x240000 {
   ipa1 |-> pa1;
   s1table host_stage1;
 }
-s2table guest1_stage2 0x2c0000 {
+s2table guest1_stage2 0x280000 {
   ipa2 |-> pa2;
   s1table guest1_stage1;
 }
-s1table hyp_map 0x300000 {
+s1table hyp_map 0x200000 {
   identity 0x1000 with code;
   identity 0x2000 with code;
   x |-> invalid;
