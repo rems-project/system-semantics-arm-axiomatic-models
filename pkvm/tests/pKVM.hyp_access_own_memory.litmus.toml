@@ -9,26 +9,26 @@ virtual x;
 physical pa1;
 intermediate ipa1 ipa2;
 
-s1table vm1_stage1 0x2C0000 {
+s1table host_stage1 0x2C0000 {
   x |-> ipa1;
 }
-s1table vm2_stage1 0x300000 {
+s1table guest1_stage1 0x300000 {
   x |-> ipa2;
 }
-s2table vm1_stage2 0x240000 {
+s2table host_stage2 0x240000 {
   ipa1 |-> invalid;
-  s1table vm1_stage1;
+  s1table host_stage1;
 }
-s2table vm2_stage2 0x280000 {
+s2table guest1_stage2 0x280000 {
   ipa1 |-> invalid;
-  s1table vm2_stage1;
+  s1table guest1_stage1;
 }
 s1table hyp_map 0x200000 {
   identity 0x1000 with code;
   identity 0x2000 with code;
   x |-> pa1;
-  s2table vm1_stage2;
-  s2table vm2_stage2;
+  s2table host_stage2;
+  s2table guest1_stage2;
 }
 *pa1 = 0;
 """
@@ -63,8 +63,8 @@ code = """
 R1 = "x"
 R3 = "x"
 TTBR0_EL2 = "ttbr(asid=0x00, base=hyp_map)"
-VTTBR_EL2 = "ttbr(vmid=0x0001, base=vm1_stage2)"
-TTBR0_EL1 = "ttbr(asid=0x00, base=vm1_stage1)"
+VTTBR_EL2 = "ttbr(vmid=0x0001, base=host_stage2)"
+TTBR0_EL1 = "ttbr(asid=0x00, base=host_stage1)"
 VBAR_EL2 = "extz(0x2000, 64)"
 
 "PSTATE.EL" = "0b10"
