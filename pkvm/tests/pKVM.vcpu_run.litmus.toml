@@ -53,8 +53,8 @@ address = "0x2400" # 0x400 - Lower Exception Level
 code = """
   MRS X11,ESR_EL2
   UBFX X11, X11, #26, #5
-  SUBS X12, X12, 0b010110
-  CBZ X12, hvc_handler
+  SUBS X11, X11, 0b010110
+  CBZ X11, hvc_handler
 dabt_handler:
   MRS X20,ELR_EL2
   ADD X20,X20,#4
