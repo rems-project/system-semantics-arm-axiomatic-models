@@ -20,7 +20,7 @@ s2table host_stage2 0x240000 {
   s1table host_stage1;
 }
 s2table guest1_stage2 0x280000 {
-  ipa1 |-> invalid;
+  ipa2 |-> invalid;
   s1table guest1_stage1;
 }
 s1table hyp_map 0x200000 {
