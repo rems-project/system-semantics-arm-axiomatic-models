@@ -22,6 +22,7 @@ s2table host_stage2 0x240000 {
 s2table guest1_stage2 0x280000 {
   ipa2 |-> pa2;
   s1table guest1_stage1;
+  s1table host_stage1;
 }
 s1table hyp_map 0x200000 {
   identity 0x1000 with code;
@@ -86,4 +87,4 @@ VBAR_EL2 = "extz(0x2000, 64)"
 "PSTATE.SP" = "0b1"
 
 [final]
-assertion = "0:X0=1 & ~0:X2=2"
+assertion = "0:X0=1 & 0:X2=1"
