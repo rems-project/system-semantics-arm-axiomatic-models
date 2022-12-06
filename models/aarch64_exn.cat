@@ -41,8 +41,8 @@ relation instruction-order
  *)
 let speculative =
     ctrl
-  | [R] ; po if Fload else empty (* NEW *)
-  | [W] ; po if Fstore else (* NEW *)
+  | if Fload then [R] ; po else 0 (* NEW *)
+  | if Fstore then [W] ; po else 0 (* NEW *)
   | addr; po
   | [T] ; instruction-order
 
@@ -202,8 +202,8 @@ let ctxob =
  (* context-synchronization-events cannot happen speculatively *)
   | speculative ; [CSE]
   (* NEW: CSE is just ISB (instead of ISB, ERET, TE) *)
-  | [ERET]; instruction-order if EOF else empty (* NEW *)
-  | [TE]; instruction-order if EIS else empty (* NEW *)
+  | if EOS then [ERET]; instruction-order else 0 (* NEW *)
+  | if EIS then [TE]; instruction-order else 0 (* NEW *)
   (* NEW: alternatively (and nicer; but can we do this?) to the three lines above: CSE is: ISB + (if EOS then ERET) + (if EIS then TE) *)
 
 (* ordered-before a translation fault *)
