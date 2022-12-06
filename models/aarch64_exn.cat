@@ -1,4 +1,5 @@
-(* sketch of exception model, based on aarch64_mmu_common.cat; WIP *)
+(* sketch of exception model, based on aarch64_mmu_common.cat; WIP
+   see lines highlighted as NEW-TO-EXN *)
 include "barriers.cat"
 
 (* For each instruction, for each read performed by the translation
@@ -41,8 +42,8 @@ relation instruction-order
  *)
 let speculative =
     ctrl
-  | if Fload then [R] ; po else 0 (* NEW *)
-  | if Fstore then [W] ; po else 0 (* NEW *)
+  | if "Fload" then [R] ; po else 0 (* NEW-TO-EXN *)
+  | if "Fstore" then [W] ; po else 0 (* NEW-TO-EXN *)
   | addr; po
   | [T] ; instruction-order
 
@@ -189,6 +190,13 @@ let obtlbi =
    *)
   | [R|W|Fault] ; iio^-1 ; (obtlbi_translate & ext) ; [TLBI]
 
+(* NEW-TO-EXN: TODO: can we write this in herd?
+let CSE =
+    ISB
+  | if "EOS" then ERET else 0
+  | if "EIS" then TE else 0
+*)
+
 (* context-change ordered-before *)
 (* note that this is under-approximate and future work is needed
  * on exceptions and context-changing operations in general *)
@@ -201,10 +209,9 @@ let ctxob =
   | [ContextChange] ; po ; [CSE]
  (* context-synchronization-events cannot happen speculatively *)
   | speculative ; [CSE]
-  (* NEW: CSE is just ISB (instead of ISB, ERET, TE) *)
-  | if EOS then [ERET]; instruction-order else 0 (* NEW *)
-  | if EIS then [TE]; instruction-order else 0 (* NEW *)
-  (* NEW: alternatively (and nicer; but can we do this?) to the three lines above: CSE is: ISB + (if EOS then ERET) + (if EIS then TE) *)
+  (* NEW-TO-EXN: (1) CSE is just ISB (instead of ISB, ERET, TE) + (2) the two lines below (see a nicer alternative above) *)
+  | if "EOS" then [ERET]; instruction-order else 0 (* NEW-TO-EXN *)
+  | if "EIS" then [TE]; instruction-order else 0 (* NEW-TO-EXN *)
 
 (* ordered-before a translation fault *)
 let obfault =
