@@ -1,16 +1,19 @@
-"VMSA weakest"
+"VMSA strong"
 include "cos.cat"
-include "barriers.cat"
-include "aarch64_mmu_common.cat"
+include "arm-common.cat"
 
-let obs = rfe | fr | wco
+(* observed by *)
+let obs = rfe | fr | co
 
-let dob = addr | data
+(* dependency-ordered-before *)
+let dob =
+    addr | data
   | ctrl; [W]
-  | (ctrl | (addr; po)); [ISB]
-  | addr; po; [W]
+  |(ctrl | (addr; po)); [ISB]; po; [R]
+  | (ctrl | (addr; po; [W]))
   | (addr | data); rfi
 
+(* atomic-ordered-before *)
 let aob = rmw
   | [range(rmw)]; rfi; [A | Q]
 
@@ -22,11 +25,10 @@ let bob = [R] ; po ; [dmbld]
   | [L]; po; [A]
   | [A | Q]; po; [R | W]
   | [R | W]; po; [L]
-  | [F | C]; po; [dsbsy]
-  | [dsb] ; po
 
 (* Ordered-before *)
-let ob = (obs | dob | aob | bob)^+
+let ob1 = obs | dob | aob | bob
+let ob = ob1^+
 
 (* Internal visibility requirement *)
 acyclic po-loc | fr | co | rf as internal

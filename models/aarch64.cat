@@ -1,35 +1,173 @@
-"arm"
+(*
+ * The ARMv8 Application Level Memory Model.
+ *
+ * See section B2.3 of the ARMv8 ARM:
+ *   https://developer.arm.com/docs/ddi0487/latest/arm-architecture-reference-manual-armv8-for-armv8-a-architecture-profile
+ *
+ * Author: Will Deacon <will.deacon@arm.com>
+ *
+ * Copyright (C) 2016, ARM Ltd.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in
+ *       the documentation and/or other materials provided with the
+ *       distribution.
+ *     * Neither the name of ARM nor the names of its contributors may be
+ *       used to endorse or promote products derived from this software
+ *       without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *)
+
+"ARMv8 AArch64"
+
+(*
+ * Include the cos.cat file shipped with herd.
+ * This builds the co relation as a total order over writes to the same
+ * location and then consequently defines the fr relation using co and
+ * rf.
+ *)
 include "cos.cat"
-include "barriers.cat"
 
-(* observed by *)
-let obs = rfe | fr | co
+enum MBReqDomain = {
+  MBReqDomain_Nonshareable,
+  MBReqDomain_InnerShareable,
+  MBReqDomain_OuterShareable,
+  MBReqDomain_FullSystem
+}
 
-(* dependency-ordered-before *)
-let dob =
-    addr | data
-  | (ctrl | (addr ; po)) ; [W]
-  | (addr | data); rfi
+enum MBReqTypes = {MBReqTypes_Reads, MBReqTypes_Writes, MBReqTypes_All}
 
-(* atomic-ordered-before *)
+accessor is_dmb: bool = .match { Barrier_DMB => true, _ => false }
+accessor is_dsb: bool = .match { Barrier_DSB => true, _ => false }
+accessor is_isb: bool = .match { Barrier_ISB => true, _ => false }
+
+define ISB(ev: Event): bool = is_isb(ev)
+
+accessor barrier_domain: MBReqDomain = .match { Barrier_DSB => .domain, Barrier_DMB => .domain, _ => default }
+accessor barrier_types: MBReqTypes = .match { Barrier_DSB => .types, Barrier_DMB => .types, _ => default }
+
+define is_dmb_barrier(ev: Event, d: MBReqDomain, t: MBReqTypes): bool =
+    is_dmb(ev) & (barrier_domain(ev) == d) & (barrier_types(ev) == t)
+
+define is_dsb_barrier(ev: Event, t: MBReqTypes): bool =
+    is_dsb(ev) & (barrier_types(ev) == t)
+
+enum Access_variety = {
+  AV_plain,
+  AV_exclusive,
+  AV_atomic_rmw
+}
+
+enum Access_strength = {
+  AS_normal,
+  AS_rel_or_acq, 
+  AS_acq_rcpc
+}
+
+accessor ak_variety: Access_variety = .access_kind.match { AK_explicit => .variety, _ => default }
+accessor ak_strength: Access_strength = .access_kind.match { AK_explicit => .variety, _ => default }
+
+define A(ev: Event): bool = R(ev) & (ak_variety(ev) == AS_rel_or_acq)
+define L(ev: Event): bool = W(ev) & (ak_variety(ev) == AS_rel_or_acq)
+
+define B(ev: Event): bool = false
+
+(*
+ * Fences
+ *)
+let dmb-ish = (po & (_ * is_dmb_barrier(_, MBReqDomain_InnerShareable, MBReqTypes_All))); po
+let dmb-ishld = (po & (_ * is_dmb_barrier(_, MBReqDomain_InnerShareable, MBReqTypes_Reads))); po
+let dmb-ishst = (po & (_ * is_dmb_barrier(_, MBReqDomain_InnerShareable, MBReqTypes_Writes))); po
+let dmb-fullsy = (po & (_ * is_dmb_barrier(_, MBReqDomain_FullSystem, MBReqTypes_All))); po
+let dmb-fullld = (po & (_ * is_dmb_barrier(_, MBReqDomain_FullSystem, MBReqTypes_Reads))); po
+let dmb-fullst = (po & (_ * is_dmb_barrier(_, MBReqDomain_FullSystem, MBReqTypes_Writes))); po
+let dmb-sy = dmb-fullsy | dmb-ish
+let dmb-ld = dmb-fullld | dmb-ishld
+let dmb-st = dmb-fullst | dmb-ishst
+(*
+ * As a restriction of the model, all observers are limited to the same
+ * inner-shareable domain. Consequently, the ISH, OSH and SY barrier
+ * options are all equivalent to each other.
+ *)
+let dsb-sy = (po & (_ * is_dsb_barrier(_, MBReqTypes_All))); po
+let dsb-ld = (po & (_ * is_dsb_barrier(_, MBReqTypes_Reads))); po
+let dsb-st = (po & (_ * is_dsb_barrier(_, MBReqTypes_Writes))); po
+let isb = (po & (_ * ISB)); po
+
+show dmb-sy,dmb-st,dmb-ld,dsb-sy,dsb-st,dsb-ld,dmb,dsb
+
+(* Dependencies *)
+show data,addr
+let ctrlisb = (ctrl & (_ * ISB)); po
+show ctrlisb
+(* show isb \ ctrlisb as isb *)
+(* show ctrl \ ctrlisb as ctrl *)
+
+(*
+ * A further restriction is that standard litmus tests are unable to
+ * distinguish between DMB and DSB instructions, so the model treats
+ * them as equivalent to each other.
+ *)
+define is_dmb_ld(ev: Event): bool = is_dmb(ev) & (barrier_types(ev) == MBReqTypes_Reads)
+define is_dmb_st(ev: Event): bool = is_dmb(ev) & (barrier_types(ev) == MBReqTypes_Writes)
+
+(* Flag any use of shareability options, due to the restrictions above. *)
+(*
+flag ~empty (dmb-full | dmb-ld | dmb-st) \
+            DMB-SY | DMB-LD | DMB-ST | DSB-SY | DSB-LD | DSB-ST
+	    as Assuming-common-inner-shareable-domain
+*)
+
+(* Coherence-after *)
+let ca = fr | co
+
+(* Observed-by *)
+let obs = rfe | fre | coe
+
+(* Dependency-ordered-before *)
+let dob = addr | data
+	| ctrl; [W]
+	| (ctrl | (addr; po)); [ISB]; po; [R]
+	| addr; po; [W]
+	| (ctrl | data); coi
+	| (addr | data); rfi
+
+(* Atomic-ordered-before *)
 let aob = rmw
-  | [range(rmw)]; rfi; [A | Q]
+	| [range(rmw)]; rfi; [A | Q]
 
-(* barrier-ordered-before *)
-let bob = [R] ; po ; [dmbld]
-  | [W] ; po ; [dmbst]
-  | [dmbst]; po; [W]
-  | [dmbld]; po; [R|W]
-  | [L]; po; [A]
-  | [A | Q]; po; [R | W]
-  | [R | W]; po; [L]
+(* Barrier-ordered-before *)
+let bob = po; ([is_dmb]|([A];amo;[L])); po
+	| [L]; po; [A]
+	| [R\NoRet]; po; [is_dmb_ld]; po
+	| [A | Q]; po
+	| [W]; po; [is_dmb_st]; po; [W]
+	| po; [L]
+	| po; [L]; coi
 
 (* Ordered-before *)
-let ob1 = obs | dob | aob | bob
-let ob = ob1^+
+let ob = (obs | dob | aob | bob)^+
 
 (* Internal visibility requirement *)
-acyclic po-loc | fr | co | rf as internal
+acyclic po-loc | ca | rf as internal
 
 (* External visibility requirement *)
 irreflexive ob as external

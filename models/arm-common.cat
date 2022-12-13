@@ -1,0 +1,14 @@
+(* memory events *)
+include "arm8.5-interface/barriers.cat"
+include "arm8.5-interface/cache_op.cat"
+include "arm8.5-interface/read_write.cat"
+
+(* registers *)
+include "arm8.5-interface/branches.cat"
+include "arm8.5-interface/exceptions.cat"
+include "arm8.5-interface/regs.cat"
+
+(* for VMSA *)
+include "arm8.5-interface/tlbi.cat"
+include "arm8.5-interface/wco.cat"
+include "arm8.5-interface/translation.cat"
