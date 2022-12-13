@@ -1,0 +1,26 @@
+enum Access_variety = {
+  AV_plain,
+  AV_exclusive,
+  AV_atomic_rmw
+}
+
+enum Access_strength = {
+  AS_normal,
+  AS_rel_or_acq, (* Release or acquire *)
+  AS_acq_rcpc (* Release-consistency with processor consistency *)
+}
+
+(* TODO: 
+ * define A(ev: Event): bool =
+ *  ev is sail_mem_read
+ *  & (ev.access_kind is Explicit_access_kind)
+ *  & (ev.access_kind.strength == AS_rel_or_acq)
+ *
+ * &c for L, Q, rmws
+ *)
+
+(* read acquire *)
+define A(ev: Event): bool = false
+
+(* write-release *)
+define L(ev: Event): bool = false
