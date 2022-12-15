@@ -3,6 +3,7 @@ include "interface-common.cat"
 
 (* arch specific *)
 include "armv9-interface/barriers.cat"
+include "armv9-interface/regs.cat"
 include "armv9-interface/tlbi.cat"
 include "armv9-interface/wco.cat"
 include "armv9-interface/translation.cat"
