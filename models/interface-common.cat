@@ -11,32 +11,29 @@ enum Access_strength = {
   AS_acq_rcpc # Release-consistency with processor consistency
 }
 
+accessor Explicit: bool = .access_kind.match {
+    AK_explicit => true,
+    _ => false
+}
+
+accessor RelAcq: bool = .access_kind.strength.match {
+    AS_rel_or_acq => true,
+    _ => false
+}
+
+accessor AcqRCpc: bool = .access_kind.strength.match {
+    AS_acq_rcpc => true,
+    _ => false
+}
+
 define A(ev: Event): bool =
-    R(ev) & ev.access_kind.match {
-        AK_explicit => .strength.match {
-            AS_rel_or_acq => true,
-            _ => false
-        },
-        _ => false
-    }
+    R(ev) & Explicit(ev) & RelAcq(ev)
 
 define Q(ev: Event): bool =
-    R(ev) & ev.access_kind.match {
-        AK_explicit => .strength.match {
-            AS_acq_rcpc => true,
-            _ => false
-        },
-        _ => false
-    }
+    R(ev) & Explicit(ev) & AcqRCpc(ev)
 
 define L(ev: Event): bool =
-    W(ev) & ev.access_kind.match {
-        AK_explicit => .strength.match {
-            AS_acq_rcpc => true,
-            _ => false
-        },
-        _ => false
-    }
+    W(ev) & Explicit(ev) & RelAcq(ev)
 
 (* cache op *)
 accessor C: bool = is sail_cache_op

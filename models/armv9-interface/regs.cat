@@ -1,0 +1,2 @@
+(* TODO: system registers *)
+define MSR(ev: Event): bool = false

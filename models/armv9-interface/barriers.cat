@@ -1,23 +1,31 @@
 (* the three barrier instructions are barriers with the right Arm Barrier kind *)
 
-define DMB(ev: Event): bool =
-    F(ev) & ev.match {
+accessor z_dmb: bool =
+    .match {
         Barrier_DMB => true,
         _ => false
     }
 
-define DSB(ev: Event): bool =
-    F(ev) & ev.match {
+accessor z_dsb: bool =
+    .match {
         Barrier_DSB => true,
         _ => false
     }
 
-define ISB(ev: Event): bool =
-    F(ev) & ev.match {
+accessor z_isb: bool =
+    .match {
         Barrier_ISB => true,
         _ => false
     }
 
+define DMB(ev: Event): bool =
+    F(ev) & z_dmb(ev)
+
+define DSB(ev: Event): bool =
+    F(ev) & z_dsb(ev)
+
+define ISB(ev: Event): bool =
+    F(ev) & z_isb(ev)
 
 (* Arm barriers can have a domain *)
 enum MBReqDomain = {
@@ -72,6 +80,12 @@ define DMBST(ev: Event): bool = DMB(ev) & ArmBarrierWW(ev)
 define DMBNSH(ev: Event): bool = DMB(ev) & ArmBarrierMM(ev) & ArmBarrierNSH(ev)
 define DMBISH(ev: Event): bool = DMB(ev) & ArmBarrierMM(ev) & ArmBarrierISH(ev)
 define DMBOSH(ev: Event): bool = DMB(ev) & ArmBarrierMM(ev) & ArmBarrierOSH(ev)
+define DMBNSHST(ev: Event): bool = DMB(ev) & ArmBarrierWW(ev) & ArmBarrierNSH(ev)
+define DMBISHST(ev: Event): bool = DMB(ev) & ArmBarrierWW(ev) & ArmBarrierISH(ev)
+define DMBOSHST(ev: Event): bool = DMB(ev) & ArmBarrierWW(ev) & ArmBarrierOSH(ev)
+define DMBNSHLD(ev: Event): bool = DMB(ev) & ArmBarrierRM(ev) & ArmBarrierNSH(ev)
+define DMBISHLD(ev: Event): bool = DMB(ev) & ArmBarrierRM(ev) & ArmBarrierISH(ev)
+define DMBOSHLD(ev: Event): bool = DMB(ev) & ArmBarrierRM(ev) & ArmBarrierOSH(ev)
 define DMBSY(ev: Event): bool = DMB(ev) & ArmBarrierMM(ev) & ArmBarrierSY(ev)
 
 define DSBLD(ev: Event): bool = DSB(ev) & ArmBarrierRM(ev)
@@ -79,6 +93,12 @@ define DSBST(ev: Event): bool = DSB(ev) & ArmBarrierWW(ev)
 define DSBNSH(ev: Event): bool = DSB(ev) & ArmBarrierMM(ev) & ArmBarrierNSH(ev)
 define DSBISH(ev: Event): bool = DSB(ev) & ArmBarrierMM(ev) & ArmBarrierISH(ev)
 define DSBOSH(ev: Event): bool = DSB(ev) & ArmBarrierMM(ev) & ArmBarrierOSH(ev)
+define DSBNSHST(ev: Event): bool = DSB(ev) & ArmBarrierWW(ev) & ArmBarrierNSH(ev)
+define DSBISHST(ev: Event): bool = DSB(ev) & ArmBarrierWW(ev) & ArmBarrierISH(ev)
+define DSBOSHST(ev: Event): bool = DSB(ev) & ArmBarrierWW(ev) & ArmBarrierOSH(ev)
+define DSBNSHLD(ev: Event): bool = DSB(ev) & ArmBarrierRM(ev) & ArmBarrierNSH(ev)
+define DSBISHLD(ev: Event): bool = DSB(ev) & ArmBarrierRM(ev) & ArmBarrierISH(ev)
+define DSBOSHLD(ev: Event): bool = DSB(ev) & ArmBarrierRM(ev) & ArmBarrierOSH(ev)
 define DSBSY(ev: Event): bool = DSB(ev) & ArmBarrierMM(ev) & ArmBarrierSY(ev)
 
 (* barrier hierarchy *)
