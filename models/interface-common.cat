@@ -1,0 +1,49 @@
+(* F for all fences *)
+accessor F: bool = is sail_barrier
+
+(* read/write *)
+# accessor R: bool = is sail_mem_read
+# accessor W: bool = is sail_mem_write
+
+enum Access_strength = {
+  AS_normal,
+  AS_rel_or_acq, # Release or acquire
+  AS_acq_rcpc # Release-consistency with processor consistency
+}
+
+define A(ev: Event): bool =
+    R(ev) & ev.access_kind.match {
+        AK_explicit => .strength.match {
+            AS_rel_or_acq => true,
+            _ => false
+        },
+        _ => false
+    }
+
+define Q(ev: Event): bool =
+    R(ev) & ev.access_kind.match {
+        AK_explicit => .strength.match {
+            AS_acq_rcpc => true,
+            _ => false
+        },
+        _ => false
+    }
+
+define L(ev: Event): bool =
+    W(ev) & ev.access_kind.match {
+        AK_explicit => .strength.match {
+            AS_acq_rcpc => true,
+            _ => false
+        },
+        _ => false
+    }
+
+(* cache op *)
+accessor C: bool = is sail_cache_op
+
+(* tlbi *)
+accessor TLBI: bool = is sail_tlbi
+
+(* exceptions *)
+accessor TE: bool = is sail_take_exception
+accessor ERET: bool = is sail_return_exception

@@ -1,0 +1,19 @@
+declare wco(Event, Event): bool
+
+(* wco has domain and range of W,TLBI *)
+assert forall ev1: Event, ev2: Event =>
+    wco(ev1, ev2) -->
+    (W(ev1) | TLBI(ev1)) & (W(ev2) | TLBI(ev2))
+
+(* wco is transitive *)
+assert forall ev1: Event, ev2: Event, ev3: Event =>
+    wco(ev1, ev2) & wco(ev2, ev3) --> wco(ev1, ev3)
+
+(* wco is total *)
+assert forall ev1: Event, ev2: Event, ev3: Event =>
+    wco(ev1, ev3) & wco(ev2, ev3) -->
+    wco(ev1, ev2) | wco(ev2, ev1)
+
+(* wco is irreflexive *)
+assert forall ev1: Event, ev2: Event, ev3: Event =>
+    wco(ev1, ev2) --> ~(ev1 == ev2)

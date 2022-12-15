@@ -1,4 +1,1 @@
-(* TODO: the new interface will have a branch_announce event (name TBD)
- * this should detect those, probably?
- *)
-define B(ev: Event): bool = false
+accessor B: bool = is sail_branch_announce
