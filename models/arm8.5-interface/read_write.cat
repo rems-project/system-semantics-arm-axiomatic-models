@@ -10,6 +10,8 @@ enum Access_strength = {
   AS_acq_rcpc (* Release-consistency with processor consistency *)
 }
 
+accessor AccessType: Access_strength = .access_kind.strength
+
 (* TODO: 
  * define A(ev: Event): bool =
  *  ev is sail_mem_read
