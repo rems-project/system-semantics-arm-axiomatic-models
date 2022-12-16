@@ -35,6 +35,9 @@ define Q(ev: Event): bool =
 define L(ev: Event): bool =
     W(ev) & Explicit(ev) & RelAcq(ev)
 
+(* branches *)
+define B(ev: Event): bool = false
+
 (* cache op *)
 accessor C: bool = is sail_cache_op
 
