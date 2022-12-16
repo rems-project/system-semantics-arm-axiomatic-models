@@ -10,10 +10,13 @@ set Stage1
 set Stage2
 
 (* A write of an invalid descriptor (an even value) is in W_invalid *)
-set W_invalid
+accessor is_some: bool = .match { Some => true, None => false }
+accessor unwrap_some: bits(64) = .match { Some => self, None => default }
+define W_invalid(ev: Event): bool =
+  W(ev) & is_some(ev.value) & (unwrap_some(ev.value)[1 .. 0] == 0x0)
 
 (* A write of a valid descriptor (an odd value) is in W_valid *)
-set W_valid
+let W_valid = W \ W_invalid
 
 (* initial writes *)
 set is_IW
