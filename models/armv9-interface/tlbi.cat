@@ -145,7 +145,7 @@ define tlbi-to-asid-read(ev1: Event, ev2: Event): bool =
     TLBI-ASID(ev1) & AT(ev2) & read_ASID(ev2) & (tlbi_asid(ev1) == extract(63, 48, val_of_read_ASID(ev2)))
 
 define tlbi-to-vmid-read(ev1: Event, ev2: Event): bool =
-    TLBI-VMID(ev1) & AT(ev2) & read_ASID(ev2) & (tlbi_vmid(ev1) == extract(63, 48, val_of_read_VMID(ev2)))
+    TLBI-VMID(ev1) & AT(ev2) & read_VMID(ev2) & (tlbi_vmid(ev1) == extract(63, 48, val_of_read_VMID(ev2)))
 
 (* Currently we only use same-vmid/same-asid between TLBIs and
  * translates, so this relation defines them in a minimal way.
