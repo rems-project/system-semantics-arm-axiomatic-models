@@ -41,16 +41,6 @@ define ContextChange(ev: Event): bool = MSR(ev) | TE(ev) | ERET(ev)
  *)
 define CSE(ev: Event): bool = ISB(ev) | TE(ev) | ERET(ev)
 
-(* TODO: read these off the interface *)
-accessor Fault: bool = is false
-accessor IsTranslationFault: bool = is false
-accessor IsPermissionFault: bool = is false
-define Fault_T(ev: Event): bool = Fault(ev) & IsTranslationFault(ev)
-define Fault_P(ev: Event): bool = Fault(ev) & IsPermissionFault(ev)
-accessor IsFromR: bool = is false
-accessor IsFromW: bool = is false
-accessor IsFromReleaseW: bool = is false
-
 (* A TLBI barriers some writes, making them unobservable to "future" reads from a translation table walk.
  *
  * tseq1 relates writes with TLBIs that ensure their visibility
@@ -138,12 +128,12 @@ let ctxob =
 
 (* ordered-before a translation fault *)
 let obfault =
-    data ; [Fault_T & IsFromW]
-  | speculative ; [Fault_T & IsFromW]
-  | [dmbst] ; po ; [Fault_T & IsFromW]
-  | [dmbld] ; po ; [Fault_T & (IsFromW | IsFromR)]
-  | [A|Q] ; po ; [Fault_T & (IsFromW | IsFromR)]
-  | [R|W] ; po ; [Fault_T & IsFromW & IsFromReleaseW]
+    data ; [Fault_T & FaultFromW]
+  | speculative ; [Fault_T & FaultFromW]
+  | [dmbst] ; po ; [Fault_T & FaultFromW]
+  | [dmbld] ; po ; [Fault_T & (FaultFromW | FaultFromR)]
+  | [A|Q] ; po ; [Fault_T & (FaultFromW | FaultFromR)]
+  | [R|W] ; po ; [Fault_T & FaultFromW & FaultFromReleaseW]
 
 (* ETS-ordered-before *)
 (* if FEAT_ETS then if E1 is ordered-before some Fault
