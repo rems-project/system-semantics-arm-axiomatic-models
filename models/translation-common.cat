@@ -10,16 +10,13 @@ set Stage1
 set Stage2
 
 (* A write of an invalid descriptor (an even value) is in W_invalid *)
-accessor is_some: bool = .match { Some => true, None => false }
-accessor unwrap_some: bits(64) = .match { Some => self, None => default }
-define W_invalid(ev: Event): bool =
-  W(ev) & is_some(ev.value) & (unwrap_some(ev.value)[1 .. 0] == 0x0)
+define has_even_value(ev: Event): bool =
+  ev.data[0 .. 0] == 0b0
+
+define W_invalid(ev: Event): bool = W(ev) & has_even_value(ev)
 
 (* A write of a valid descriptor (an odd value) is in W_valid *)
-let W_valid = W \ W_invalid
-
-(* initial writes *)
-set is_IW
+define W_valid(ev: Event): bool = W(ev) & ~W_invalid(ev)
 
 relation iio
 relation instruction-order
@@ -62,13 +59,13 @@ accessor IsFromReleaseW: bool = is false
  *  as a, b are no longer visible to translation table walks
  *)
 let tlb_might_affect =
-    [ TLBI-S1 & ~TLBI-S2 &  TLBI-VA  &  TLBI-ASID & TLBI-VMID] ; (translate-same-va-page & translate-same-asid & translate-same-vmid) ; [T & Stage1]
-  | [ TLBI-S1 & ~TLBI-S2 &  TLBI-VA  &  TLBI-ASID & ~TLBI-VMID] ; (translate-same-va-page & translate-same-asid) ; [T & Stage1]
-  | [ TLBI-S1 & ~TLBI-S2 & ~TLBI-VA  &  TLBI-ASID & TLBI-VMID] ; (translate-same-asid & translate-same-vmid) ; [T & Stage1]
-  | [ TLBI-S1 & ~TLBI-S2 & ~TLBI-VA  & ~TLBI-ASID & TLBI-VMID] ; translate-same-vmid ; [T & Stage1]
-  | [~TLBI-S1 &  TLBI-S2 &  TLBI-IPA & ~TLBI-ASID & TLBI-VMID] ; (translate-same-ipa-page & translate-same-vmid) ; [T & Stage2]
-  | [~TLBI-S1 &  TLBI-S2 & ~TLBI-IPA & ~TLBI-ASID & TLBI-VMID] ; translate-same-vmid ; [T & Stage2]
-  | [ TLBI-S1 &  TLBI-S2 & ~TLBI-IPA & ~TLBI-ASID & TLBI-VMID] ; translate-same-vmid ; [T]
+    [ TLBI-S1 & ~TLBI-S2 &  TLBI-VA  &  TLBI-ASID & TLBI-VMID] ; (tlbi-translate-same-va-page & tlbi-translate-same-asid & tlbi-translate-same-vmid) ; [T & Stage1]
+  | [ TLBI-S1 & ~TLBI-S2 &  TLBI-VA  &  TLBI-ASID & ~TLBI-VMID] ; (tlbi-translate-same-va-page & tlbi-translate-same-asid) ; [T & Stage1]
+  | [ TLBI-S1 & ~TLBI-S2 & ~TLBI-VA  &  TLBI-ASID & TLBI-VMID] ; (tlbi-translate-same-asid & tlbi-translate-same-vmid) ; [T & Stage1]
+  | [ TLBI-S1 & ~TLBI-S2 & ~TLBI-VA  & ~TLBI-ASID & TLBI-VMID] ; tlbi-translate-same-vmid ; [T & Stage1]
+  | [~TLBI-S1 &  TLBI-S2 &  TLBI-IPA & ~TLBI-ASID & TLBI-VMID] ; (tlbi-translate-same-ipa-page & tlbi-translate-same-vmid) ; [T & Stage2]
+  | [~TLBI-S1 &  TLBI-S2 & ~TLBI-IPA & ~TLBI-ASID & TLBI-VMID] ; tlbi-translate-same-vmid ; [T & Stage2]
+  | [ TLBI-S1 &  TLBI-S2 & ~TLBI-IPA & ~TLBI-ASID & TLBI-VMID] ; tlbi-translate-same-vmid ; [T]
   | ( TLBI-S1 &            ~TLBI-IPA & ~TLBI-ASID & ~TLBI-VMID) * (T & Stage1)
   | (            TLBI-S2 & ~TLBI-IPA & ~TLBI-ASID & ~TLBI-VMID) * (T & Stage2)
 (*  | (TLBI-ALL * T) *)

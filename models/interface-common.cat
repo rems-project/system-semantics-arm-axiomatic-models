@@ -39,7 +39,10 @@ define L(ev: Event): bool =
 define B(ev: Event): bool = false
 
 (* cache op *)
-accessor C: bool = is sail_cache_op
+(* tlbis are a kind of cache op ?*)
+accessor is_cacheop: bool = is sail_cache_op
+accessor is_tlbi: bool = is sail_tlbi
+define C(ev: Event): bool = is_cacheop(ev) | is_tlbi(ev)
 
 (* tlbi *)
 accessor TLBI: bool = is sail_tlbi

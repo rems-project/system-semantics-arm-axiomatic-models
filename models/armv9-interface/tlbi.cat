@@ -31,6 +31,11 @@
 
 enum Regime = {Regime_EL3, Regime_EL30, Regime_EL2, Regime_EL20, Regime_EL10}
 
+accessor tlbi_regime: Regime = .rec.regime
+
+define has_tlbi_regime(ev: Event, reg: Regime): bool =
+    tlbi_regime(ev) == reg
+
 enum TLBIOp = {
   TLBIOp_DALL,
   TLBIOp_DASID,
@@ -52,73 +57,83 @@ enum TLBIOp = {
   TLBIOp_PAALL
 }
 
+accessor tlbi_op: TLBIOp = .rec.op
+
+define has_tlbi_op(ev: Event, op: TLBIOp): bool =
+    tlbi_op(ev) == op
+
 enum Shareability = {Shareability_NSH, Shareability_ISH, Shareability_OSH}
+
+accessor tlbi_shareability: Shareability = .shareability
+
+define has_tlbi_shareability(ev: Event, share: Shareability): bool =
+    tlbi_shareability(ev) == share
 
 accessor tlbi_vmid: bits(16) = .rec.vmid
 accessor tlbi_asid: bits(16) = .rec.asid
+accessor tlbi_address: bits(64) = .rec.address
 
 (* TODO:
  * these TLBI-* need careful checking, there are lots of TLBIOp and complex combinations
  *)
 
-accessor TLBI-ASID: bool = .rec.op.match {
-    TLBIOp_ASID => true,
-    TLBIOp_VA => true,
-    TLBIOp_VAA => true,
-    _ => false
-}
+(* operation *)
+
+define TLBI-ASID(ev: Event): bool = 
+    TLBI(ev) & (
+          has_tlbi_op(ev, TLBIOp_ASID)
+        | has_tlbi_op(ev, TLBIOp_VA)
+        | has_tlbi_op(ev, TLBIOp_VAA)
+    )
+
+define TLBI-S1(ev: Event): bool = 
+    TLBI(ev) & (
+          has_tlbi_op(ev, TLBIOp_VA)
+        | has_tlbi_op(ev, TLBIOp_VMALLS12)
+        | has_tlbi_op(ev, TLBIOp_VMALL)
+        | has_tlbi_op(ev, TLBIOp_ALL)
+        | has_tlbi_op(ev, TLBIOp_ASID)
+    )
+
+define TLBI-S2(ev: Event): bool = 
+    TLBI(ev) & (
+          has_tlbi_op(ev, TLBIOp_IPAS2)
+        | has_tlbi_op(ev, TLBIOp_VMALLS12)
+        | has_tlbi_op(ev, TLBIOp_VMALL)
+        | has_tlbi_op(ev, TLBIOp_ALL)
+        | has_tlbi_op(ev, TLBIOp_ASID)
+    )
 
 
-accessor TLBI-S1: bool = .rec.op.match {
-    TLBIOp_VA => true,
-    TLBIOp_VMALLS12 => true,
-    TLBIOp_VMALL => true,
-    TLBIOp_ALL => true,
-    TLBIOp_ASID => true,
-    _ => false
-}
+define TLBI-VMID(ev: Event): bool = 
+    TLBI(ev) & (
+          has_tlbi_op(ev, TLBIOp_VA)
+        | has_tlbi_op(ev, TLBIOp_VAA)
+        | has_tlbi_op(ev, TLBIOp_IPAS2)
+        | has_tlbi_op(ev, TLBIOp_VMALLS12)
+        | has_tlbi_op(ev, TLBIOp_VMALL)
+        | has_tlbi_op(ev, TLBIOp_ASID)
+    )
 
-accessor TLBI-S2: bool = .rec.op.match {
-    TLBIOp_IPAS2 => true,
-    TLBIOp_VMALLS12 => true,
-    _ => false
-}
+define TLBI-VA(ev: Event): bool = 
+    TLBI(ev) & has_tlbi_op(ev, TLBIOp_VA)
 
-accessor TLBI-VMID: bool = .rec.op.match {
-    TLBIOp_VA => true,
-    TLBIOp_VAA => true,
-    TLBIOp_IPAS2 => true,
-    TLBIOp_VMALLS12 => true,
-    TLBIOp_VMALL => true,
-    TLBIOp_ASID => true,
-    _ => false
-}
+define TLBI-IPA(ev: Event): bool = 
+    TLBI(ev) & has_tlbi_op(ev, TLBIOp_IPAS2)
 
-accessor TLBI-EL1: bool = .rec.regime.match {
-    Regime_EL10 => true,
-    _ => false
-}
-accessor TLBI-EL2: bool = .rec.regime.match {
-    Regime_EL2 => true,
-    _ => false
-}
+(* regime *)
 
-accessor TLBI-VA: bool = .rec.op.match {
-    TLBIOp_VA => true,
-    _ => false
-}
+define TLBI-EL1(ev: Event): bool = 
+    TLBI(ev) & has_tlbi_regime(ev, Regime_EL10)
 
-accessor TLBI-IPA: bool = .rec.op.match {
-    TLBIOp_IPAS2 => true,
-    TLBIType_IPAS2E1IS => true,
-    _ => false
-}
+define TLBI-EL2(ev: Event): bool = 
+    TLBI(ev) & has_tlbi_regime(ev, Regime_EL2)
 
-accessor TLBI-IS: bool = .shareability.match {
-    Shareability_ISH => true,
-    Shareability_OSH => true,
-    _ => false
-}
+
+(* shareability *)
+
+define TLBI-IS(ev: Event): bool =
+    TLBI(ev) & (has_tlbi_shareability(ev, Shareability_ISH) | has_tlbi_shareability(ev, Shareability_OSH))
 
 (* read ASID/VMID from the register read *)
 
@@ -135,5 +150,27 @@ define tlbi-to-vmid-read(ev1: Event, ev2: Event): bool =
 (* Currently we only use same-vmid/same-asid between TLBIs and
  * translates, so this relation defines them in a minimal way.
  *)
-let translate-same-vmid = tlbi-to-vmid-read; [read_VMID]; same-translation
-let translate-same-asid = tlbi-to-asid-read; [read_ASID]; same-translation
+let tlbi-translate-same-vmid = tlbi-to-vmid-read; [read_VMID]; same-translation
+let tlbi-translate-same-asid = tlbi-to-asid-read; [read_ASID]; same-translation
+
+
+(* for TLBI by address 
+ * this is not quite right... instead we should take note of what the level of the T is
+ * and therefore what range it maps over, to determine if the TLBI affects it.
+ * c.f. InvalidateWide
+ *)
+
+define pageof(addr: bits(64)): bits(36) =
+    addr[47 .. 12]
+
+define page_overlaps(addr1: bits(64), addr2: bits(64)): bool =
+    pageof(addr1) == pageof(addr2)
+
+define tlbi_address_page_overlaps_with(ev: Event, addr: bits(64)): bool =
+    tlbi_address(ev)
+
+define tlbi-translate-same-va-page(ev1: Event, ev2: Event): bool =
+    TLBI-VA(ev1) & T(ev2) & page_overlaps(tlbi_address(ev1), translate_va(ev))
+
+define tlbi-translate-same-va-page(ev1: Event, ev2: Event): bool =
+    TLBI-IPA(ev1) & T(ev2) & page_overlaps(tlbi_address(ev1), translate_ipa(ev))
