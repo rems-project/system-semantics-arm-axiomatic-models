@@ -172,5 +172,5 @@ define tlbi_address_page_overlaps_with(ev: Event, addr: bits(64)): bool =
 define tlbi-translate-same-va-page(ev1: Event, ev2: Event): bool =
     TLBI-VA(ev1) & T(ev2) & page_overlaps(tlbi_address(ev1), translate_va(ev))
 
-define tlbi-translate-same-va-page(ev1: Event, ev2: Event): bool =
+define tlbi-translate-same-ipa-page(ev1: Event, ev2: Event): bool =
     TLBI-IPA(ev1) & T(ev2) & page_overlaps(tlbi_address(ev1), translate_ipa(ev))
