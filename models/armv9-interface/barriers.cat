@@ -1,5 +1,12 @@
 (* the three barrier instructions are barriers with the right Arm Barrier kind *)
 
+accessor is_DxB: bool =
+    .match {
+        Barrier_DMB => true,
+        Barrier_DSB => true,
+        _ => false
+    }
+
 accessor z_dmb: bool =
     .match {
         Barrier_DMB => true,
@@ -35,43 +42,42 @@ enum MBReqDomain = {
   MBReqDomain_FullSystem
 }
 
-accessor ArmBarrierNSH: bool = .domain.match {
-    MBReqDomain_Nonshareable => true,
-    _ => false
+accessor barrier_domain: MBReqDomain = .match {
+    Barrier_DMB => .domain,
+    Barrier_DSB => .domain,
+    _ => default
 }
 
-accessor ArmBarrierISH: bool = .domain.match {
-    MBReqDomain_InnerShareable => true,
-    _ => false
-}
+define has_barrier_domain(ev: Event, d: MBReqDomain): bool =
+    barrier_domain(ev) == d
 
-accessor ArmBarrierOSH: bool = .domain.match {
-    MBReqDomain_OuterShareable => true,
-    _ => false
-}
-
-accessor ArmBarrierSY: bool = .domain.match {
-    MBReqDomain_FullSystem => true,
-    _ => false
-}
+define ArmBarrierNSH(ev: Event): bool =
+    is_DxB(ev) & has_barrier_domain(ev, MBReqDomain_Nonshareable)
+define ArmBarrierISH(ev: Event): bool =
+    is_DxB(ev) & has_barrier_domain(ev, MBReqDomain_InnerShareable)
+define ArmBarrierOSH(ev: Event): bool =
+    is_DxB(ev) & has_barrier_domain(ev, MBReqDomain_OuterShareable)
+define ArmBarrierSY(ev: Event): bool =
+    is_DxB(ev) & has_barrier_domain(ev, MBReqDomain_FullSystem)
 
 (* Arm barriers can have types *)
 enum MBReqTypes = {MBReqTypes_Reads, MBReqTypes_Writes, MBReqTypes_All}
 
-accessor ArmBarrierRM: bool = .types.match {
-    MBReqTypes_Reads => true,
-    _ => false
+accessor barrier_types: MBReqTypes = .match {
+    Barrier_DMB => .types,
+    Barrier_DSB => .types,
+    _ => default
 }
 
-accessor ArmBarrierWW: bool = .types.match {
-    MBReqTypes_Writes => true,
-    _ => false
-}
+define has_barrier_type(ev: Event,t: MBReqTypes): bool =
+    (barrier_types(ev) == t)
 
-accessor ArmBarrierMM: bool = .types.match {
-    MBReqTypes_All => true,
-    _ => false
-}
+define ArmBarrierRM(ev: Event): bool =
+    is_DxB(ev) & has_barrier_type(ev, MBReqTypes_Reads)
+define ArmBarrierWW(ev: Event): bool =
+    is_DxB(ev) & has_barrier_type(ev, MBReqTypes_Writes)
+define ArmBarrierMM(ev: Event): bool =
+    is_DxB(ev) & has_barrier_type(ev, MBReqTypes_All)
 
 (* individual barrier instructions *)
 
