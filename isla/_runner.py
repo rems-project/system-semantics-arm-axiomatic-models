@@ -7,11 +7,11 @@ example usage:
 aarch64_mmu_strong_ETS.cat  MP+pos  Allow
 
 > # or with all the extra info
-> ./run.sh path/to/MP+pos.litmus.toml --verbose --isla-verbose
+> ./run.sh path/to/MP+pos.litmus.toml -vv
 [...]
 
 > # or for debugging a test
-> ./run.sh path/to/MP+pos.litmus.toml --isla-debug
+> ./run.sh path/to/MP+pos.litmus.toml -vvv
 [...]
 
 > # with a different model
@@ -57,9 +57,9 @@ else:
 # +--+--models/
 DEFAULT_ISLA_AXIOMATIC_PATH = ISLA_DIR / "target" / "release" / "isla-axiomatic"
 DEFAULT_ARCH = REMS_DIR / "isla-snapshots" / "armv9.ir"
-DEFAULT_CONFIG = ISLA_DIR / "configs" / "aarch64_mmu_on.toml"
+DEFAULT_CONFIG = ISLA_DIR / "configs" / "armv9_mmu_on.toml"
 DEFAULT_MODEL = REMS_DIR / "systems-isla-tests" / "models" / "aarch64_mmu_strong_ETS.cat"
-DEFAULT_FOOTPRINT = ISLA_DIR / "configs" / "aarch64.toml"
+DEFAULT_FOOTPRINT = ISLA_DIR / "configs" / "armv9.toml"
 
 DEFAULT_DOT_DIR = HERE / "dots"
 DEFAULT_TEX_DIR = HERE / "tex"
@@ -357,11 +357,16 @@ class LitmusTest:
             if config.verbose >= 4:
                 debug_args += "m"
 
+            debug_args += "".join(config.debug_args)
+
             extra.extend(["-D", debug_args])
             probes = [
                 "__FetchNextInstr",
                 "BranchTo",
                 "AArch64_TakeException",
+                "PC_read",
+                "__ExecuteInstr",
+                *config.probes,
             ]
 
             for p in probes:
@@ -534,6 +539,8 @@ def _add_common_args(parser):
     # enable/disable isla-axiomatic optimizations
     parser.add_argument("--optimize", metavar="ARG", default=DEFAULT_OPT, help=f"command to pass to isla-axiomatic (default: {DEFAULT_OPT!r})")
     parser.add_argument("--no-optimize", dest="optimize", action="store_const", const=None)
+    parser.add_argument("--probes", metavar="PROBES", nargs="*", default=[], help=f"additional --probe commands to isla")
+    parser.add_argument("--debug-args", metavar="D", nargs="*", default=[], help=f"additional -D commands to isla")
     parser.add_argument("--default-isla-args", default="--graph-human-readable")
     parser.add_argument("--no-default-isla-args", dest="default-args", action="store_const", const="")
     parser.add_argument("--extraargs", help="extra arguments to pass directly to `isla-axiomatic`")
@@ -576,6 +583,9 @@ def main(argv=None) -> int:
     tar_parser.add_argument("nightly", metavar="DIRNAME", default=_nightly_dirname(), help="name of the nightly dir (default: nightly-YYYY-MM-DD)")
 
     args = parser.parse_args(argv)
+
+    # collect comma-separated probes
+    args.probes = [p for pr in args.probes for p in pr.split(",")]
 
     if args.command is None:
         parser.print_usage(sys.stderr)
