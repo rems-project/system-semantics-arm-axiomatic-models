@@ -1,0 +1,1 @@
+Run `make example` to run isla on an example pagetable test and produce a diagram of the allowed execution
