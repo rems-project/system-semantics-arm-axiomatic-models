@@ -1,7 +1,0 @@
-pKVM.guest_access_own_memory.litmus.toml
-pKVM.host_access_own_memory.litmus.toml
-pKVM.host_share_hyp.litmus.toml
-pKVM.host_unshare_hyp.concurrent.litmus.toml
-pKVM.host_unshare_hyp.litmus.toml
-pKVM.hyp_access_own_memory.litmus.toml
-pKVM.vcpu_run.litmus.toml

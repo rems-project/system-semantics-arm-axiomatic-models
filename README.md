@@ -1,4 +1,7 @@
-# systems-isla-tests
+# system-semantics-arm-axiomatic-models
 
-VMSA models and tooling extras. 
-Litmus tests at https://github.com/litmus-tests/litmus-tests-armv8a-system-vmsa
+Arm VMSA axiomatic models
+
+See `esop22` git tag for the ESOP'22 paper versions of the models.
+VMSA litmus tests can be found at https://github.com/litmus-tests/litmus-tests-armv8a-system-vmsa
+isla-axiomatic machinery can be found in ./isla_machinery/
