@@ -1,5 +1,18 @@
+(* A baseline Arm-A non-mixed-size multi-copy atomic model 
+ * using the armv9 sail concurrency interface
+ *
+ * with surgery on `obs` and `bob` for easy extension by ifetch/vmsa models.
+ *)
+
+"Arm-A base"
+
 include "cos.cat"
 include "arm-common.cat"
+
+(* might-be speculatively executed *)
+let speculative =
+    ctrl
+  | addr; po
 
 (* observed by *)
 let obs = rfe | fr | co
@@ -7,23 +20,25 @@ let obs = rfe | fr | co
 (* dependency-ordered-before *)
 let dob =
     addr | data
-  | ctrl; [W]
-  |(ctrl | (addr; po)); [ISB]; po; [R]
-  | (ctrl | (addr; po; [W]))
+  | speculative ; [W]
+  | speculative ; [ISB]
   | (addr | data); rfi
 
 (* atomic-ordered-before *)
-let aob = rmw
+let aob =
+    rmw
   | [range(rmw)]; rfi; [A | Q]
 
 (* barrier-ordered-before *)
-let bob = [R] ; po ; [dmbld]
+let bob =
+    [R] ; po ; [dmbld]
   | [W] ; po ; [dmbst]
   | [dmbst]; po; [W]
   | [dmbld]; po; [R|W]
   | [L]; po; [A]
   | [A | Q]; po; [R | W]
   | [R | W]; po; [L]
+  | [ISB] ; po ; [R]
 
 (* Ordered-before *)
 let ob1 = obs | dob | aob | bob

@@ -1,0 +1,113 @@
+enum CacheOp = {CacheOp_Clean, CacheOp_Invalidate, CacheOp_CleanInvalidate}
+enum Shareability = {Shareability_NSH, Shareability_ISH, Shareability_OSH}
+
+enum CacheOpScope = {
+  CacheOpScope_SetWay,
+  CacheOpScope_PoU,
+  CacheOpScope_PoC,
+  CacheOpScope_PoP,
+  CacheOpScope_PoDP,
+  CacheOpScope_ALLU,
+  CacheOpScope_ALLUIS
+}
+
+enum CachePASpace = {
+  CPAS_NonSecure,
+  CPAS_Any,
+  CPAS_RealmNonSecure,
+  CPAS_Realm,
+  CPAS_Root,
+  CPAS_SecureNonSecure,
+  CPAS_Secure
+}
+
+enum CacheType = {
+  CacheType_Data,
+  CacheType_Tag,
+  CacheType_Data_Tag,
+  CacheType_Instruction
+}
+
+(*struct CacheRecord = {
+  acctype : AccType,
+  cacheop : CacheOp,
+  opscope : CacheOpScope,
+  cachetype : CacheType,
+  regval : bits(64),
+  paddress : FullAddress,
+  vaddress : bits(64),
+  set : int,
+  way : int,
+  level : int,
+  shareability : Shareability,
+  translated : bool,
+  is_vmid_valid : bool,
+  vmid : bits(16),
+  is_asid_valid : bool,
+  asid : bits(16),
+  security : SecurityState,
+  cpas : CachePASpace
+}*)
+
+accessor cache_op_kind: CacheOp = .cacheop
+accessor cache_op_type: CacheType = .cachetype
+accessor cache_op_scope: CacheOpScope = .opscope
+accessor cache_op_shareability: Shareability = .shareability
+
+define DC(ev: Event): bool =
+    is_cacheop(ev) & (cache_op_type(ev) == CacheType_Data)
+
+define IC(ev: Event): bool =
+    is_cacheop(ev) & (cache_op_type(ev) == CacheType_Instruction)
+
+define c_has_kind(ev: Event, kind: CacheOp): bool =
+    (cache_op_kind(ev) == kind)
+
+define Clean(ev: Event): bool =
+    is_cacheop(ev) & (c_has_kind(ev, CacheOp_Clean) | c_has_kind(ev, CacheOp_CleanInvalidate))
+
+define Invalidate(ev: Event): bool =
+    is_cacheop(ev) & (c_has_kind(ev, CacheOp_Invalidate) | c_has_kind(ev, CacheOp_CleanInvalidate))
+
+define c_to_scope(ev: Event, scope: CacheOpScope): bool =
+    is_cacheop(ev) & (cache_op_scope(ev) == scope)
+
+define CacheOpByVA(ev: Event): bool =
+    is_cacheop(ev) & (
+          c_to_scope(ev, CacheOpScope_PoU) 
+        | c_to_scope(ev, CacheOpScope_PoC)
+        | c_to_scope(ev, CacheOpScope_PoP)
+    )
+
+define CacheOpAll(ev: Event): bool =
+    is_cacheop(ev) & (
+          c_to_scope(ev, CacheOpScope_ALLU) 
+        | c_to_scope(ev, CacheOpScope_ALLUIS)
+    )
+
+define c_for_shareability_domain(ev: Event, dom: Shareability): bool =
+    is_cacheop(ev) & (cache_op_shareability(ev) == dom)
+
+define CacheOpIS(ev: Event): bool =
+    is_cacheop(ev) & (c_for_shareability_domain(ev, Shareability_ISH) | c_for_shareability_domain(ev, Shareability_OSH))
+
+(* helpers for the various DC/IC variations *)
+
+define DC_CVAU(ev: Event): bool =
+    DC(ev) & Clean(ev) & CacheOpByVA(ev)
+
+define IC_IVAU(ev: Event): bool =
+    IC(ev) & Invalidate(ev) & CacheOpByVA(ev)
+
+define IC_ALL(ev: Event): bool =
+    IC(ev) & Invalidate(ev) & CacheOpAll(ev)
+
+define IC_ALLIS(ev: Event): bool =
+    IC(ev) & Invalidate(ev) & CacheOpAll(ev) & CacheOpIS(ev)
+
+define scl(ev1: Event, ev2: Event): bool =
+    (phys_addr(ev1) == phys_addr(ev2))
+
+let cacheop-affects =
+      scl; [IF]      (* IC IVAU, DC CVAU only affect IFs to the same cache line *)
+    | (IC_ALL * IF)  (* IC ALL* affects all ifetches *)

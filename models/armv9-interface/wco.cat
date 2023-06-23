@@ -1,6 +1,6 @@
 declare wco(Event, Event): bool
 
-(* wco has domain and range of W,TLBI *)
+(* wco has domain and range of W,C *)
 assert forall ev1: Event, ev2: Event =>
     wco(ev1, ev2) -->
     (W(ev1) | C(ev1) | (ev1 == IW)) & (W(ev2) | C(ev2))

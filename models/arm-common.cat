@@ -1,10 +1,21 @@
 (* generic interface *)
 include "interface-common.cat"
 
+accessor read_phys_addr: bits(56) = .pa
+accessor write_phys_addr: bits(56) = .pa
+accessor cacheop_phys_addr: bits(52) = .paddress.address
+
+define phys_addr(ev: Event): bits(52) =
+    ite(R(ev), read_phys_addr(ev) [52 .. 0],
+    ite(W(ev), write_phys_addr(ev) [52 .. 0],
+    ite(is_cacheop(ev), cacheop_phys_addr(ev) [52 .. 0], 0x0)))
+
 (* arch specific *)
 include "armv9-interface/barriers.cat"
 include "armv9-interface/regs.cat"
-include "armv9-interface/tlbi.cat"
+(* include "armv9-interface/tlbi.cat" *)
 include "armv9-interface/wco.cat"
-include "armv9-interface/translation.cat"
+(* include "armv9-interface/translation.cat" *)
 include "armv9-interface/exceptions.cat"
+include "armv9-interface/ifetch.cat"
+include "armv9-interface/cacheops.cat"

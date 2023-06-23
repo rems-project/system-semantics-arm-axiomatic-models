@@ -1,0 +1,81 @@
+"Arm-A ifetch"
+
+include "cos.cat"
+include "arm-common.cat"
+
+(* might-be speculatively executed *)
+let speculative =
+    ctrl
+  | addr; po
+
+(* Fetch-ordered-before *)
+let fob =
+    [IF]; fpo; [IF]
+  | [IF]; fe
+  | [ISB]; fe^-1; fpo
+
+(* Cache-op-ordered-before *)
+let cob =
+    [R | W]; (po & scl); [DC]
+  | [DC]; (po & scl); [DC]
+
+(* DC synchronised required after a write *)
+let dcsync =
+  if IDC
+    then id
+    else [W]; (wco & scl); [DC]
+
+(* IC synchronisation required after a write or DC 
+ * Note that `[W] ; icsync` may not correspond to sufficient synchronisation
+ * in the case where DIC=0 (and the DC is required).
+ * see `isyncob` for the correct synchronisation requirements.
+ *)
+let icsync =
+  if DIC
+    then id
+    else [W | DC]; (wco & cacheop-affects); [IC]
+
+(* instruction synchronised ordered before *)
+let isyncob =
+  ifr; dcsync; icsync
+
+(* observed by *)
+let obs = rfe | fr | wco | irf
+
+(* dependency-ordered-before *)
+let dob =
+    addr | data
+  | speculative ; [W]
+  | speculative ; [ISB]
+  | (addr | data); rfi
+
+(* atomic-ordered-before *)
+let aob =
+    rmw
+  | [range(rmw)]; rfi; [A | Q]
+
+(* barrier-ordered-before *)
+let bob = 
+    [R] ; po ; [dmbld]
+  | [W] ; po ; [dmbst]
+  | [dmbst]; po; [W]
+  | [dmbld]; po; [R|W]
+  | [L]; po; [A]
+  | [A | Q]; po; [R | W]
+  | [R | W]; po; [L]
+  (*| [ISB] ; po ; [R]*) (* subsumed by fob *)
+  | [F | C]; po; [dsbsy]
+  | [dsb] ; po
+
+(* Ordered-before *)
+let ob1 = obs | dob | aob | bob | fob | cob | isyncob
+let ob = ob1^+
+
+(* Internal visibility requirement *)
+acyclic po-loc | fr | co | rf as internal
+
+(* External visibility requirement *)
+irreflexive ob as external
+
+(* Atomic: Basic LDXR/STXR constraint to forbid intervening writes. *)
+empty rmw & (fre; coe) as atomic

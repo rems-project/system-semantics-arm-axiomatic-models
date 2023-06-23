@@ -1,3 +1,7 @@
+(* only include the tlbi interface stuff if actually using --pgtable *)
+include "armv9-interface/tlbi.cat"
+include "armv9-interface/translation.cat"
+
 (* For each instruction, for each read performed by the translation
    table walk ASL code, we generate one translate-read (T) event. If
    the translation finds an invalid entry, the translate-read event

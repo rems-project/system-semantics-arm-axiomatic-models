@@ -141,6 +141,10 @@ set read_VMID
 set read_ASID
 relation same-translation
 
+(*let read_VMID = try read_VMID with emptyset
+let read_ASID = try read_ASID with emptyset
+let same-translation = try same-translation with emptyset*)
+
 define tlbi-to-asid-read(ev1: Event, ev2: Event): bool =
     TLBI-ASID(ev1) & AT(ev2) & read_ASID(ev2) & (tlbi_asid(ev1) == extract(63, 48, val_of_read_ASID(ev2)))
 

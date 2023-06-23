@@ -46,20 +46,24 @@ ISLA_DIR = REMS_DIR / "isla"
 if "TMPDIR" in os.environ:
     TMPDIR = pathlib.Path(os.environ["TMPDIR"])
 else:
-    TMPDIR = HERE / "_tmp"
+    TMPDIR = None
 
 # assuming dir structure:
 # + rems/
 # +--isla/
 # +--system-semantics-arm-confidential/
 # +--+--isla/
-# +--systems-isla-tests/
+# +--system-semantics-arm-axiomatic-models/
 # +--+--models/
 DEFAULT_ISLA_AXIOMATIC_PATH = ISLA_DIR / "target" / "release" / "isla-axiomatic"
 DEFAULT_ARCH = REMS_DIR / "isla-snapshots" / "armv9.ir"
-DEFAULT_CONFIG = ISLA_DIR / "configs" / "armv9_mmu_on.toml"
-DEFAULT_MODEL = REMS_DIR / "systems-isla-tests" / "models" / "aarch64_mmu_strong_ETS.cat"
+DEFAULT_CONFIG = ISLA_DIR / "configs" / "armv9.toml"
+DEFAULT_CONFIG_PGTABLE = ISLA_DIR / "configs" / "armv9_mmu_on.toml"
+DEFAULT_MODEL = REMS_DIR / "system-semantics-arm-axiomatic-models" / "models" / "aarch64_base.cat"
+DEFAULT_MODEL_PGTABLE = REMS_DIR / "system-semantics-arm-axiomatic-models" / "models" / "aarch64_mmu_strong_ETS.cat"
+DEFAULT_MODEL_IFETCH = REMS_DIR / "system-semantics-arm-axiomatic-models" / "models" / "aarch64_ifetch.cat"
 DEFAULT_FOOTPRINT = ISLA_DIR / "configs" / "armv9.toml"
+DEFAULT_ISLA_LITMUS = ISLA_DIR / "isla-litmus" / "isla-litmus"
 
 DEFAULT_DOT_DIR = HERE / "dots"
 DEFAULT_TEX_DIR = HERE / "tex"
@@ -69,29 +73,41 @@ DEFAULT_OPT = "--remove-uninteresting=safe"
 
 CURRENTLY_RUNNING_ISLA_INSTANCES = set()
 
-LD_LIBRARY_PATH = os.environ.get("LD_LIBRARY_PATH", "")
-LD_LIBRARY_PATH = f"{ISLA_DIR}:{LD_LIBRARY_PATH}"
+class Mode(enum.Enum):
+    DATA = enum.auto()
+    IFETCH = enum.auto()
+    PGTABLE = enum.auto()
 
-# example invokation:
-# ../../isla/target/release/isla-axiomatic
-#   --arch=../../isla-snapshots/aarch64.ir
-#   --config=../../isla/configs/aarch64_mmu_on.toml
-#   --model=../../systems-isla-tests/models/aarch64_mmu_strong_ETS.cat
-#   --armv8-page-tables
-#   --footprint-config=../../isla/configs/aarch64.toml
-#   --check-sat-using "(then dt2bv qe simplify solve-eqs bv)"
-#   --verbose --remove-uninteresting safe
-#   --dot ./dots/MP+pos.litmus/
-#   -t ../../litmus-tests/litmus-tests-armv8a-system-vmsa/tests/data/HAND/MP+pos.litmus.toml
+DEFAULT_MODE = Mode.DATA
+
+_default_model = {
+    Mode.DATA: DEFAULT_MODEL,
+    Mode.IFETCH: DEFAULT_MODEL_IFETCH,
+    Mode.PGTABLE: DEFAULT_MODEL_PGTABLE,
+}
+
+_default_config = {
+    Mode.DATA: DEFAULT_CONFIG,
+    Mode.IFETCH: DEFAULT_CONFIG,
+    Mode.PGTABLE: DEFAULT_CONFIG_PGTABLE,
+}
+
+_default_tmpdir = {
+    Mode.DATA: HERE / "_tmp",
+    Mode.IFETCH: HERE / "_tmp",
+    Mode.PGTABLE: HERE / "_tmp_pgtable",
+}
+
 async def _run_isla(
     litmus_test: "LitmusTest",
     *extra,
+    mode=DEFAULT_MODE,
     isla_path=DEFAULT_ISLA_AXIOMATIC_PATH,
     arch=DEFAULT_ARCH,
     config=DEFAULT_CONFIG,
+    footprint_config=DEFAULT_FOOTPRINT,
     model=DEFAULT_MODEL,
     opt=DEFAULT_OPT,
-    footprint=DEFAULT_FOOTPRINT,
     dot_dir: pathlib.Path = None,
     generate_latex_only: bool = False,
     runner_config,
@@ -117,12 +133,18 @@ async def _run_isla(
         cmd.append(f"{isla_path}")
 
     cmd.extend([
-        f"--armv8-page-tables",
         f"--arch={arch}",
         f"--config={config}",
         f"--model={model}",
-        f"--footprint-config={footprint}",
+        f"--footprint-config={footprint_config}",
     ])
+
+    if mode == Mode.PGTABLE:
+        cmd.append(f"--armv8-page-tables")
+    elif mode == Mode.IFETCH:
+        cmd.append(f"--ifetch")
+
+    cmd.append(f"--isla-litmus={runner_config.isla_litmus}")
 
     if opt:
         cmd.append(opt)
@@ -132,6 +154,9 @@ async def _run_isla(
 
     if dot_dir is not None:
         cmd.append(f"--dot={dot_dir}")
+
+    if not runner_config.generate_output_model:
+        cmd.append("--no-z3-model")
 
     if generate_latex_only:
         cmd.append(f"--latex={runner_config.latex}")
@@ -152,7 +177,7 @@ async def _run_isla(
 
     cmd.extend(extra)
 
-    env = {"LD_LIBRARY_PATH": LD_LIBRARY_PATH, "TMPDIR": str(TMPDIR)}
+    env = {"TMPDIR": str(TMPDIR)}
     stdout = collections.deque(maxlen=10)
 
     async def _passthrough_stream(stream):
@@ -291,24 +316,31 @@ class LitmusTest:
         if not p.exists():
             raise LitmusError(f"Test {p} does not exist")
 
-        required_suffix = ".litmus.toml"
-        if p.name[-len(required_suffix):] != required_suffix:
-            raise LitmusError(f"Test {p} does not appear to be a .litmus.toml file")
+        required_suffixes = [".litmus.toml", ".litmus"]
+        for suffix in required_suffixes:
+            if p.name[-len(suffix):] == suffix:
+                break
+        else:
+            raise LitmusError(
+                f"Test {p} does not appear to be one of: {required_suffixes}"
+            )
 
-        # instead of depending on toml just read that name="..." field
-        content = p.read_text()
-        m = re.search(r"name\s*=\s*[\'\"](?P<name>.*)[\'\"]", content)
-        if m is None:
-            raise LitmusError(f"Could not find [name] for test {p}")
+        test_name_from_filename = p.name[:-len(suffix)]
 
         # sanity check the name matches the name without the .litmus.toml
-        test_name_from_filename = p.name[:-len(required_suffix)]
-        test_name_from_toml = m["name"]
+        # instead of depending on toml just read that name="..." field
+        if suffix == ".litmus.toml":
+            content = p.read_text()
+            m = re.search(r"name\s*=\s*[\'\"](?P<name>.*)[\'\"]", content)
+            if m is None:
+                raise LitmusError(f"Could not find [name] for test {p}")
 
-        if test_name_from_filename != test_name_from_toml:
-            raise LitmusError(f"Test {p} has different name {test_name_from_toml!r} in file")
+            test_name_from_toml = m["name"]
 
-        return cls(test_name_from_toml, p)
+            if test_name_from_filename != test_name_from_toml:
+                raise LitmusError(f"Test {p} has different name {test_name_from_toml!r} in file")
+
+        return cls(test_name_from_filename, p)
 
     @classmethod
     def from_collection_path(cls, p):
@@ -340,6 +372,7 @@ class LitmusTest:
         if config.generate_latex:
             await _run_isla(
                 self,
+                mode=config.mode,
                 isla_path=config.isla_axiomatic,
                 arch=config.arch,
                 config=config.config,
@@ -384,6 +417,7 @@ class LitmusTest:
         # run again to get the actual results
         res = await _run_isla(
             self,
+            mode=config.mode,
             isla_path=config.isla_axiomatic,
             arch=config.arch,
             config=config.config,
@@ -394,7 +428,9 @@ class LitmusTest:
             *extra,
         )
 
-        await _compile_dots(self, dot_dir=config.dot, runner_config=config)
+        if config.dot is not None:
+            await _compile_dots(self, dot_dir=config.dot, runner_config=config)
+
         return res
 
 @contextlib.contextmanager
@@ -532,9 +568,13 @@ class Runner:
 
 def _add_common_args(parser):
     # shared configuration
-    parser.add_argument("--config", metavar="PATH", default=DEFAULT_CONFIG, help=f"config to pass to isla-axiomatic (default: {DEFAULT_CONFIG})")
+    parser.add_argument("--config", metavar="PATH", default=None, help=f"config to pass to isla-axiomatic (default: {DEFAULT_CONFIG})")
     parser.add_argument("--arch", metavar="PATH", default=DEFAULT_ARCH, help=f"arch to pass to isla-axiomatic (default: {DEFAULT_ARCH})")
     parser.add_argument("--isla-axiomatic", metavar="PATH", default=DEFAULT_ISLA_AXIOMATIC_PATH, type=pathlib.Path, help=f"path to isla-axiomatic (default: {DEFAULT_ISLA_AXIOMATIC_PATH})")
+    parser.add_argument("--isla-litmus", metavar="PATH", default=DEFAULT_ISLA_LITMUS, type=pathlib.Path, help=f"path to isla-litmus (default: {DEFAULT_ISLA_LITMUS})")
+
+    parser.add_argument("--ifetch", dest="mode", action="store_const", const=Mode.IFETCH, help="Run isla-axiomatic with ifetch mode enabled")
+    parser.add_argument("--pgtable", dest="mode", action="store_const", const=Mode.PGTABLE, help="Run isla-axiomatic with translation table walks enabled")
 
     # enable/disable isla-axiomatic optimizations
     parser.add_argument("--optimize", metavar="ARG", default=DEFAULT_OPT, help=f"command to pass to isla-axiomatic (default: {DEFAULT_OPT!r})")
@@ -566,11 +606,13 @@ def main(argv=None) -> int:
 
     run_parser = subparsers.add_parser("run", help="Run litmus tests")
     _add_common_args(run_parser)
-    run_parser.add_argument("--model", metavar="PATH", dest="models", nargs="+", type=pathlib.Path, default=DEFAULT_MODEL, help=f"model to pass to isla-axiomatic (default: {DEFAULT_MODEL})")
+    run_parser.add_argument("--model", metavar="PATH", dest="models", nargs="+", type=pathlib.Path, default=None, help=f"model to pass to isla-axiomatic (default: {DEFAULT_MODEL})")
     run_parser.add_argument("--dot", metavar="PATH", default=DEFAULT_DOT_DIR, type=pathlib.Path, help=f"directory to store generated graphs (default: {DEFAULT_DOT_DIR})")
+    run_parser.add_argument("--no-graph", dest="dot", action="store_const", const=None, help=f"do not generate graph")
+    run_parser.add_argument("--no-output-model", dest="generate_output_model", action="store_false", help=f"do not generate output model")
 
     # tests passed positionally
-    run_parser.add_argument("tests", metavar="TEST_PATH", type=pathlib.Path, nargs="*", help="paths to .litmus.toml files to run")
+    run_parser.add_argument("tests", metavar="TEST_PATH", type=pathlib.Path, nargs="*", help="paths to .litmus or .litmus.toml files to run")
 
     nightly_parser = subparsers.add_parser("nightly", help="Run a batched nightly run")
     _add_common_args(nightly_parser)
@@ -592,14 +634,21 @@ def main(argv=None) -> int:
         print("error: one of {run,nightly,tar} required", file=sys.stderr)
         sys.exit(1)
 
-    if hasattr(args, "models"):
-        if args.models is None:
-            args.models = [DEFAULT_MODEL]
-        elif not isinstance(args.models, list):
-            args.models = [args.models]
+    # substitute some mode-specific defaults
+    if args.mode is None:
+        args.mode = Mode.DATA
+    if hasattr(args, "model") and args.model is None:
+        args.model = _default_model[args.mode]
+    if hasattr(args, "models") and args.models is None:
+        args.models = [_default_model[args.mode]]
+    if args.config is None:
+        args.config = _default_config[args.mode]
+    if TMPDIR is None:
+        if args.tmpdir is not None:
+            TMPDIR = args.tmpdir
+        else:
+            TMPDIR = _default_tmpdir[args.mode]
 
-    if args.tmpdir is not None:
-        TMPDIR = pathlib.Path(args.tmpdir)
 
     runner = Runner()
     try:

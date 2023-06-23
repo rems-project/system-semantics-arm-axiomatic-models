@@ -11,8 +11,25 @@ enum Access_strength = {
   AS_acq_rcpc # Release-consistency with processor consistency
 }
 
+# struct Explicit_access_kind = {
+#   variety : Access_variety,
+#   strength : Access_strength
+# }
+
+# union Access_kind('arch_ak : Type) = {
+#   AK_explicit: Explicit_access_kind,
+#   AK_ifetch : unit, // Instruction fetch
+#   AK_ttw : unit, // Translation table walk
+#   AK_arch : 'arch_ak // Architecture specific type of access
+# }
+
 accessor Explicit: bool = .access_kind.match {
     AK_explicit => true,
+    _ => false
+}
+
+accessor Ifetch: bool = .access_kind.match {
+    AK_ifetch => true,
     _ => false
 }
 
@@ -34,6 +51,9 @@ define Q(ev: Event): bool =
 
 define L(ev: Event): bool =
     W(ev) & Explicit(ev) & RelAcq(ev)
+
+#define IF(ev: Event): bool =
+#    R(ev) & Ifetch(ev)
 
 (* branches *)
 define B(ev: Event): bool = false
