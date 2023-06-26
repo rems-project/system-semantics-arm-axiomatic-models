@@ -105,9 +105,19 @@ define IC_ALL(ev: Event): bool =
 define IC_ALLIS(ev: Event): bool =
     IC(ev) & Invalidate(ev) & CacheOpAll(ev) & CacheOpIS(ev)
 
-define scl(ev1: Event, ev2: Event): bool =
-    (phys_addr(ev1) == phys_addr(ev2))
+let scl = same-cache-line
+
+let same-dcache-line = scl
+let same-icache-line = scl
+
+let dcacheop-affects =
+    scl; [IF]
+
+let icacheop-affects =
+      scl; [IF]
+    | (IC_ALL * IF)
 
 let cacheop-affects =
-      scl; [IF]      (* IC IVAU, DC CVAU only affect IFs to the same cache line *)
-    | (IC_ALL * IF)  (* IC ALL* affects all ifetches *)
+      (DC * IF) & dcacheop-affects
+    | (IC * IF) & icacheop-affects
+    | (W * IF) & same-loc

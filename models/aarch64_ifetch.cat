@@ -23,7 +23,7 @@ let cob =
 let dcsync =
   if IDC
     then id
-    else [W]; (wco & scl); [DC]
+    else [W]; (wco & same-dcache-line); [DC]
 
 (* IC synchronisation required after a write or DC 
  * Note that `[W] ; icsync` may not correspond to sufficient synchronisation
@@ -33,11 +33,22 @@ let dcsync =
 let icsync =
   if DIC
     then id
-    else [W | DC]; (wco & cacheop-affects); [IC]
+    else (
+    (* can check directly if the IC invalidated line contains W *)
+      [W]; (wco & same-icache-line); [IC]
+    (* IC and DC may have different cacheline sizes, so have to check the W we sync on *)
+    | [DC]; wco; [IC]
+    )
+
+let cachesync =
+  dcsync; icsync
 
 (* instruction synchronised ordered before *)
 let isyncob =
-  ifr; dcsync; icsync
+    (* the [IF] happened before the [W}]
+     * and the [W] has a sufficient DC; IC sequence after it,
+     * and the [IF] would have been affected by that sequence *)
+    (ifr; cachesync) & cacheop-affects^-1
 
 (* observed by *)
 let obs = rfe | fr | wco | irf
