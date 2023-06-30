@@ -507,7 +507,7 @@ class Runner:
                     print(f"{model}\t{test.name},{result.name}")
             # if nightly build then collect up results into tarball
             elif args.command == "nightly":
-                nightly_tmp_dirname = _nightly_dirname()
+                nightly_tmp_dirname = args.out
 
                 # collect tests
                 tests = []
@@ -584,6 +584,7 @@ def _add_common_args(parser):
     parser.add_argument("--default-isla-args", default="--graph-human-readable")
     parser.add_argument("--no-default-isla-args", dest="default-args", action="store_const", const="")
     parser.add_argument("--extraargs", help="extra arguments to pass directly to `isla-axiomatic`")
+    parser.add_argument("--no-output-model", dest="generate_output_model", action="store_false", help=f"do not generate output model")
 
     parser.add_argument("--generate-latex", action="store_true", default=True)
     parser.add_argument("--no-generate-latex", dest="generate_latex", action="store_false")
@@ -609,7 +610,6 @@ def main(argv=None) -> int:
     run_parser.add_argument("--model", metavar="PATH", dest="models", nargs="+", type=pathlib.Path, default=None, help=f"model to pass to isla-axiomatic (default: {DEFAULT_MODEL})")
     run_parser.add_argument("--dot", metavar="PATH", default=DEFAULT_DOT_DIR, type=pathlib.Path, help=f"directory to store generated graphs (default: {DEFAULT_DOT_DIR})")
     run_parser.add_argument("--no-graph", dest="dot", action="store_const", const=None, help=f"do not generate graph")
-    run_parser.add_argument("--no-output-model", dest="generate_output_model", action="store_false", help=f"do not generate output model")
 
     # tests passed positionally
     run_parser.add_argument("tests", metavar="TEST_PATH", type=pathlib.Path, nargs="*", help="paths to .litmus or .litmus.toml files to run")
@@ -619,6 +619,7 @@ def main(argv=None) -> int:
 
     nightly_parser.add_argument("tests", metavar="TEST_PATH", default=None, type=pathlib.Path, nargs=1, help="path to single @file with names of all tests to run")
     nightly_parser.add_argument("--models", metavar="MODEL_PATH", dest="models", default=None, type=pathlib.Path, nargs="+")
+    nightly_parser.add_argument("-out", metavar="DIRNAME", default=_nightly_dirname(), help="name of the nightly dir/tarball (default: nightly-YYYY-MM-DD)")
 
     tar_parser = subparsers.add_parser("tar", help="Make a nightly tarball")
     _add_common_args(tar_parser)

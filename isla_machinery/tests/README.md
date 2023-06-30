@@ -1,1 +1,1 @@
-Tests moved to https://github.com/rems-project/systems-isla-tests
+VMSA tests moved to https://github.com/litmus-tests/litmus-tests-armv8a-system-vmsa
