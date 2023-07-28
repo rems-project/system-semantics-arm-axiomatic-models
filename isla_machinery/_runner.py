@@ -362,8 +362,8 @@ class LitmusTest:
     async def run(self, config) -> Result:
         extra = []
 
-        if config.extraargs is not None:
-            extra.extend(shlex.split(config.extraargs))
+        for ea in config.extraargs:
+            extra.extend(shlex.split(ea))
 
         if config.default_isla_args:
             extra.extend(shlex.split(config.default_isla_args))
@@ -583,7 +583,7 @@ def _add_common_args(parser):
     parser.add_argument("--debug-args", metavar="D", nargs="*", default=[], help=f"additional -D commands to isla")
     parser.add_argument("--default-isla-args", default="--graph-human-readable")
     parser.add_argument("--no-default-isla-args", dest="default-args", action="store_const", const="")
-    parser.add_argument("--extraargs", help="extra arguments to pass directly to `isla-axiomatic`")
+    parser.add_argument("--extraargs", help="extra arguments to pass directly to `isla-axiomatic`", action="append", default=[])
     parser.add_argument("--no-output-model", dest="generate_output_model", action="store_false", help=f"do not generate output model")
 
     parser.add_argument("--generate-latex", action="store_true", default=True)
