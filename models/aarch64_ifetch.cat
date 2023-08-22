@@ -26,7 +26,7 @@ let dcsync =
     else [W]; (wco & same-dcache-line); [DC]
 
 (* IC synchronisation required after a write or DC 
- * Note that `[W] ; icsync` may not correspond to sufficient synchronisation
+ * Note that `[W]; icsync` may not correspond to sufficient synchronisation
  * in the case where DIC=0 (and the DC is required).
  * see `isyncob` for the correct synchronisation requirements.
  *)
@@ -56,8 +56,8 @@ let obs = rfe | fr | wco | irf
 (* dependency-ordered-before *)
 let dob =
     addr | data
-  | speculative ; [W]
-  | speculative ; [ISB]
+  | speculative; [W]
+  | speculative; [ISB]
   | (addr | data); rfi
 
 (* atomic-ordered-before *)
@@ -67,16 +67,16 @@ let aob =
 
 (* barrier-ordered-before *)
 let bob = 
-    [R] ; po ; [dmbld]
-  | [W] ; po ; [dmbst]
+    [R]; po; [dmbld]
+  | [W]; po; [dmbst]
   | [dmbst]; po; [W]
   | [dmbld]; po; [R|W]
   | [L]; po; [A]
   | [A | Q]; po; [R | W]
   | [R | W]; po; [L]
-  (*| [ISB] ; po ; [R]*) (* subsumed by fob *)
+  (*| [ISB]; po; [R]*) (* subsumed by fob *)
   | [F | C]; po; [dsbsy]
-  | [dsb] ; po
+  | [dsb]; po
   | [dmbsy]; po; [DC]
 
 (* Ordered-before *)
