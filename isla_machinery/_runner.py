@@ -310,7 +310,7 @@ class LitmusTest:
         self.src_path = src_path
 
     @classmethod
-    def from_path(cls, p):
+    def from_path(cls, p, allow_bad_names=False):
         """ check the path `p` exists and is the right format before creating a `LitmusTest` object.
         """
         if not p.exists():
@@ -338,24 +338,28 @@ class LitmusTest:
             test_name_from_toml = m["name"]
 
             if test_name_from_filename != test_name_from_toml:
-                raise LitmusError(f"Test {p} has different name {test_name_from_toml!r} in file")
+                msg = f"Test {p} has different name {test_name_from_toml!r} in file"
+                if not allow_bad_names:
+                    raise LitmusError(f"{msg} (pass --allow-bad-names to continue anyway)")
+                else:
+                    print(msg, file=sys.stderr)
 
         return cls(test_name_from_filename, p)
 
     @classmethod
-    def from_collection_path(cls, p):
+    def from_collection_path(cls, p, allow_bad_names=False):
         content = p.read_text()
         for line in content.splitlines():
             if line.strip():
-                yield from cls.tests_from_test_file(p.parent / line)
+                yield from cls.tests_from_test_file(p.parent / line, allow_bad_names=allow_bad_names)
 
     @classmethod
-    def tests_from_test_file(cls, test_path):
+    def tests_from_test_file(cls, test_path, allow_bad_names=False):
         if test_path.stem[0] == "@":
-            yield from cls.from_collection_path(test_path)
+            yield from cls.from_collection_path(test_path, allow_bad_names=allow_bad_names)
         else:
             try:
-                yield cls.from_path(test_path)
+                yield cls.from_path(test_path, allow_bad_names=allow_bad_names)
             except LitmusError as e:
                 print(e, file=sys.stderr)
 
@@ -500,7 +504,7 @@ class Runner:
 
                 tests = []
                 for test_path in args.tests:
-                    tests.extend(LitmusTest.tests_from_test_file(test_path))
+                    tests.extend(LitmusTest.tests_from_test_file(test_path, allow_bad_names=args.allow_bad_names))
                 results = self._run_all(tests, args)
 
                 async for model, test, result in results:
@@ -512,7 +516,7 @@ class Runner:
                 # collect tests
                 tests = []
                 for test_path in args.tests:
-                    tests.extend(LitmusTest.tests_from_test_file(test_path))
+                    tests.extend(LitmusTest.tests_from_test_file(test_path, allow_bad_names=args.allow_bad_names))
 
                 nightly_tmp = TMPDIR / nightly_tmp_dirname
                 nightly_tmp.mkdir(parents=True)  # if exists, raise error.
@@ -593,6 +597,8 @@ def _add_common_args(parser):
     parser.add_argument("-v", "--verbose", action="count", default=0)
     parser.add_argument("--z3-memory", metavar="N", default=None)
     parser.add_argument("--gdb", action="store_true", default=False)
+
+    parser.add_argument("--allow-bad-names", action="store_true", default=False, help="Allow mismatched names between file and [name] attribute")
 
     parser.add_argument("--tmpdir", metavar="PATH", default=None, type=pathlib.Path, help=f"$TMPDIR override (current: {TMPDIR})")
 
