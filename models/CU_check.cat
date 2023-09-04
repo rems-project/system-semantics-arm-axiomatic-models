@@ -1,4 +1,24 @@
-(* Check for executions which exhibit ConstrainedUnpredictable behaviour (WIP) *)
+(* Check for ConstrainedUnpredictable behaviour (WIP)
+ *
+ * The way this works is that this file is a variant of the normal model,
+ * with an additional axiom which asserts there is unpredictable behaviour.
+ *
+ * If an execution is allowed in this model,
+ * then it was allowed in the original
+ * *and* it contains constrained unpredictable behaviour,
+ * and so the whole test should be defined to have unpredictable behaviour.
+ *
+*)
+include "aarch64_ifetch.cat"
+
+
+(* would like to say [W]; loc; [IF] and get the value of the W
+ * but, because isla uses a single event named "IW" for the initial writes
+ * we need a special case for that *)
+define W_or_IW_to(ev1: Event, ev2: Event): bool =
+    IF(ev2) &
+    ((W(ev1) & loc(ev1, ev2))
+     | (ev1 == IW))
 
 (* could-fetch-from *)
 (* [W]; cff; [IF] iff
@@ -6,20 +26,36 @@
  *  the W is not ordered after the IF
  *  and there is no instruction synchronisation sequence between them
  *)
-cff = ([W]; loc; [IF]) \ ob^-1 \ (isyncob^-1; ob)
+let cff =
+  W_or_IW_to
+    \ ob^-1
+    \ (isyncob^-1; ob)
 
-(* cmodx(IF) is True if the opcode fetched is in the list of concurrenty modifiable instructions *)
-define cmodx(ev1: Event): bool =
-    IF(ev1) (* TODO: check for Unconditional Branches *)
+(* cmodx(opcode) is True
+ * if it is in the list of concurrently modifiable instructions
+ *)
+define cmodx(v: bits(32)): bool =
+      (v == 0xd503201f) (* NOP *)
+    | (extract(31, 26, v) == 0b000101) (* B *)
+    | (extract(31, 26, v) == 0b100101) (* BL *)
+    | (v == 0xd5033fdf) (* ISB *)
+    | ((extract(31, 21, v) == 0b11010100001) & (extract(4, 0, v) == 0b00000)) (* BRK *)
+    | ((extract(31, 21, v) == 0b11010100000) & (extract(4, 2, v) == 0b000)) (* SVC/HVC/SMC *)
+
+define cmodx_W_or_IW(ev1: Event, ev2: Event): bool =
+    ite(W(ev1), cmodx(val_of_32(ev1)), cmodx(ev2.opcode()))
 
 (* cff_bad(W1, IF, W2) if IF could have fetched from either (W1, W2)
  * and one of the pair (W1, W2) is not a concurrently modifiable instruction
  *)
-define cff_bad(ev1: Event, ev2: Event, ev3: Event): bool =
-    W(ev1) & IF(ev2) & W(ev3)
-    & ~(ev1 = ev3)
-    & cff(ev1, ev2) & cff(ev3, ev2)
-    & ~cmodx(ev2)
+define cff_bad(
+    ev1: Event,
+    ev2: Event,
+    ev3: Event
+  ): bool =
+    cff(ev1, ev2) & cff(ev3, ev2)
+    & ~(ev1 == ev3)
+    & (~cmodx_W_or_IW(ev1, ev2) | ~cmodx_W_or_IW(ev3, ev2))
 
 (* ideally this would be a flag (in the made-up herd-like syntax at the bottom)
  *
@@ -30,7 +66,11 @@ define cff_bad(ev1: Event, ev2: Event, ev3: Event): bool =
  * if the execution is still satisfiable, then it exhibited constrained unpredictable behaviour
  * and the entire test should be flagged as such.
  *)
-assert exists ev1: Event, ev2: Event, ev3: Event =>
-    cff_bad(ev1, ev2, ev3)
+assert exists
+    ev1: Event,
+    ev2: Event,
+    ev3: Event
+  =>
+    cff_bad(ev1, ev2, ev3) (*:named CU*)
 
 (* flag empty cff_bad as CU *)
