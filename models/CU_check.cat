@@ -43,7 +43,7 @@ define cmodx(v: bits(32)): bool =
     | ((extract(31, 21, v) == 0b11010100000) & (extract(4, 2, v) == 0b000)) (* SVC/HVC/SMC *)
 
 define cmodx_W_or_IW(ev1: Event, ev2: Event): bool =
-    ite(W(ev1), cmodx(val_of_32(ev1)), cmodx(ev2.opcode()))
+    ite(W(ev1), cmodx(val_of_32(ev1)), cmodx(ifetch_initial_opcode(ev2)))
 
 (* cff_bad(W1, IF, W2) if IF could have fetched from either (W1, W2)
  * and one of the pair (W1, W2) is not a concurrently modifiable instruction
