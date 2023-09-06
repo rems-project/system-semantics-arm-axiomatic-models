@@ -35,12 +35,12 @@ define ISB(ev: Event): bool =
     F(ev) & z_isb(ev)
 
 (* Arm barriers can have a domain *)
-enum MBReqDomain = {
-  MBReqDomain_Nonshareable,
-  MBReqDomain_InnerShareable,
-  MBReqDomain_OuterShareable,
-  MBReqDomain_FullSystem
-}
+# enum MBReqDomain = {
+#   MBReqDomain_Nonshareable,
+#   MBReqDomain_InnerShareable,
+#   MBReqDomain_OuterShareable,
+#   MBReqDomain_FullSystem
+# }
 
 accessor barrier_domain: MBReqDomain = .match {
     Barrier_DMB => .domain,
@@ -61,7 +61,7 @@ define ArmBarrierSY(ev: Event): bool =
     is_DxB(ev) & has_barrier_domain(ev, MBReqDomain_FullSystem)
 
 (* Arm barriers can have types *)
-enum MBReqTypes = {MBReqTypes_Reads, MBReqTypes_Writes, MBReqTypes_All}
+# enum MBReqTypes = {MBReqTypes_Reads, MBReqTypes_Writes, MBReqTypes_All}
 
 accessor barrier_types: MBReqTypes = .match {
     Barrier_DMB => .types,

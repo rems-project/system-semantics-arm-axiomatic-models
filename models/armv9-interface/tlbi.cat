@@ -29,40 +29,40 @@
 (* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.   *)
 (* ********************************************************************** *)
 
-enum Regime = {Regime_EL3, Regime_EL30, Regime_EL2, Regime_EL20, Regime_EL10}
+# enum Regime = {Regime_EL3, Regime_EL30, Regime_EL2, Regime_EL20, Regime_EL10}
 
 accessor tlbi_regime: Regime = .rec.regime
 
 define has_tlbi_regime(ev: Event, reg: Regime): bool =
     tlbi_regime(ev) == reg
 
-enum TLBIOp = {
-  TLBIOp_DALL,
-  TLBIOp_DASID,
-  TLBIOp_DVA,
-  TLBIOp_IALL,
-  TLBIOp_IASID,
-  TLBIOp_IVA,
-  TLBIOp_ALL,
-  TLBIOp_ASID,
-  TLBIOp_IPAS2,
-  TLBIOp_VAA,
-  TLBIOp_VA,
-  TLBIOp_VMALL,
-  TLBIOp_VMALLS12,
-  TLBIOp_RIPAS2,
-  TLBIOp_RVAA,
-  TLBIOp_RVA,
-  TLBIOp_RPA,
-  TLBIOp_PAALL
-}
+# enum TLBIOp = {
+#   TLBIOp_DALL,
+#   TLBIOp_DASID,
+#   TLBIOp_DVA,
+#   TLBIOp_IALL,
+#   TLBIOp_IASID,
+#   TLBIOp_IVA,
+#   TLBIOp_ALL,
+#   TLBIOp_ASID,
+#   TLBIOp_IPAS2,
+#   TLBIOp_VAA,
+#   TLBIOp_VA,
+#   TLBIOp_VMALL,
+#   TLBIOp_VMALLS12,
+#   TLBIOp_RIPAS2,
+#   TLBIOp_RVAA,
+#   TLBIOp_RVA,
+#   TLBIOp_RPA,
+#   TLBIOp_PAALL
+# }
 
 accessor tlbi_op: TLBIOp = .rec.op
 
 define has_tlbi_op(ev: Event, op: TLBIOp): bool =
     tlbi_op(ev) == op
 
-enum Shareability = {Shareability_NSH, Shareability_ISH, Shareability_OSH}
+# enum Shareability = {Shareability_NSH, Shareability_ISH, Shareability_OSH}
 
 accessor tlbi_shareability: Shareability = .shareability
 

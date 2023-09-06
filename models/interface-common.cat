@@ -5,11 +5,11 @@ accessor F: bool = is sail_barrier
 # accessor R: bool = is sail_mem_read
 # accessor W: bool = is sail_mem_write
 
-enum Access_strength = {
-  AS_normal,
-  AS_rel_or_acq, # Release or acquire
-  AS_acq_rcpc # Release-consistency with processor consistency
-}
+# enum Access_strength = {
+#   AS_normal,
+#   AS_rel_or_acq, # Release or acquire
+#   AS_acq_rcpc # Release-consistency with processor consistency
+# }
 
 # struct Explicit_access_kind = {
 #   variety : Access_variety,

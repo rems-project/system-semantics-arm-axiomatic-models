@@ -1,32 +1,32 @@
-enum CacheOp = {CacheOp_Clean, CacheOp_Invalidate, CacheOp_CleanInvalidate}
-enum Shareability = {Shareability_NSH, Shareability_ISH, Shareability_OSH}
+# enum CacheOp = {CacheOp_Clean, CacheOp_Invalidate, CacheOp_CleanInvalidate}
+# enum Shareability = {Shareability_NSH, Shareability_ISH, Shareability_OSH}
 
-enum CacheOpScope = {
-  CacheOpScope_SetWay,
-  CacheOpScope_PoU,
-  CacheOpScope_PoC,
-  CacheOpScope_PoP,
-  CacheOpScope_PoDP,
-  CacheOpScope_ALLU,
-  CacheOpScope_ALLUIS
-}
+# enum CacheOpScope = {
+#   CacheOpScope_SetWay,
+#   CacheOpScope_PoU,
+#   CacheOpScope_PoC,
+#   CacheOpScope_PoP,
+#   CacheOpScope_PoDP,
+#   CacheOpScope_ALLU,
+#   CacheOpScope_ALLUIS
+# }
 
-enum CachePASpace = {
-  CPAS_NonSecure,
-  CPAS_Any,
-  CPAS_RealmNonSecure,
-  CPAS_Realm,
-  CPAS_Root,
-  CPAS_SecureNonSecure,
-  CPAS_Secure
-}
+# enum CachePASpace = {
+#   CPAS_NonSecure,
+#   CPAS_Any,
+#   CPAS_RealmNonSecure,
+#   CPAS_Realm,
+#   CPAS_Root,
+#   CPAS_SecureNonSecure,
+#   CPAS_Secure
+# }
 
-enum CacheType = {
-  CacheType_Data,
-  CacheType_Tag,
-  CacheType_Data_Tag,
-  CacheType_Instruction
-}
+# enum CacheType = {
+#   CacheType_Data,
+#   CacheType_Tag,
+#   CacheType_Data_Tag,
+#   CacheType_Instruction
+# }
 
 (*struct CacheRecord = {
   acctype : AccType,
