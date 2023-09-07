@@ -26,6 +26,7 @@ aarch64_mmu_strong_ETS.cat  MP+pos  Allow
 
 import os
 import re
+import ast
 import csv
 import sys
 import enum
@@ -35,6 +36,7 @@ import tarfile
 import asyncio
 import pathlib
 import argparse
+import itertools
 import contextlib
 import datetime as dt
 import collections
@@ -107,6 +109,7 @@ async def _run_isla(
     config=DEFAULT_CONFIG,
     footprint_config=DEFAULT_FOOTPRINT,
     model=DEFAULT_MODEL,
+    variants=None,
     opt=DEFAULT_OPT,
     dot_dir: pathlib.Path = None,
     generate_latex_only: bool = False,
@@ -164,6 +167,10 @@ async def _run_isla(
 
     if runner_config.z3_memory is not None:
         cmd.append(f"--memory={runner_config.z3_memory}")
+
+    if variants is not None and variants != []:
+        variants = ",".join(variants)
+        cmd.append(f"--variant={variants}")
 
     # for performance
     cmd.append("--check-sat-using")
@@ -426,6 +433,7 @@ class LitmusTest:
             arch=config.arch,
             config=config.config,
             model=config.model,
+            variants=config.variant,
             opt=config.optimize,
             dot_dir=config.dot,
             runner_config=config,
@@ -487,12 +495,20 @@ class Runner:
 
             sys.exit(1)
 
+    def _mk_model_results_filename(self, nightly_tmp_dir, model_name, variants=None):
+        fname = model_name
+        if variants is not None and variants != []:
+            variants = "_".join(variants)
+            fname = f"{fname}_{variants}"
+        return (nightly_tmp_dir / fname).with_suffix(".txt")
+
     async def _run_all(self, tests, args):
-        for model in args.models:
+        for model, variants in zip(args.models, args.variants):
             for t in tests:
                 args.model = model
+                args.variant = variants
                 res = await t.run(args)
-                yield (model, t, res)
+                yield (model, variants, t, res)
 
     async def run_tests(self, args) -> None:
         try:
@@ -507,8 +523,12 @@ class Runner:
                     tests.extend(LitmusTest.tests_from_test_file(test_path, allow_bad_names=args.allow_bad_names))
                 results = self._run_all(tests, args)
 
-                async for model, test, result in results:
-                    print(f"{model}\t{test.name},{result.name}")
+                async for model, variants, test, result in results:
+                    if variants:
+                        variants = ",".join(variants)
+                        print(f"{model}({variants})\t{test.name},{result.name}")
+                    else:
+                        print(f"{model}\t{test.name},{result.name}")
             # if nightly build then collect up results into tarball
             elif args.command == "nightly":
                 nightly_tmp_dirname = args.out
@@ -534,16 +554,16 @@ class Runner:
                 args.latex = nightly_tmp_tex_dir
 
                 # touch all the model results files
-                for model in args.models:
+                for model, variants in zip(args.models, args.variants):
                     model_name = _model_name(model)
-                    model_results_path = (nightly_tmp / model_name).with_suffix(".txt")
+                    model_results_path = self._mk_model_results_filename(nightly_tmp, model_name, variants)
                     model_results_path.write_text("")
 
                 results = self._run_all(tests, args)
 
-                async for model, test, result in results:
+                async for model, variants, test, result in results:
                     model_name = _model_name(model)
-                    model_results_path = (nightly_tmp / model_name).with_suffix(".txt")
+                    model_results_path = self._mk_model_results_filename(nightly_tmp, model_name, variants)
                     with open(model_results_path, "a", newline="") as f:
                         writer = csv.writer(f)
                         writer.writerow([f"{test.name}", f"{result.name}"])
@@ -603,6 +623,11 @@ def _add_common_args(parser):
     parser.add_argument("--tmpdir", metavar="PATH", default=None, type=pathlib.Path, help=f"$TMPDIR override (current: {TMPDIR})")
 
 
+def fail(msg):
+    print(msg, file=sys.stderr)
+    sys.exit(1)
+
+
 def main(argv=None) -> int:
     # it's ok, it's a super-global environment var anyway
     global TMPDIR
@@ -614,6 +639,7 @@ def main(argv=None) -> int:
     run_parser = subparsers.add_parser("run", help="Run litmus tests")
     _add_common_args(run_parser)
     run_parser.add_argument("--model", metavar="PATH", dest="models", nargs="+", type=pathlib.Path, default=None, help=f"model to pass to isla-axiomatic (default: {DEFAULT_MODEL})")
+    run_parser.add_argument("--variant", metavar="VARIANT", dest="variants", default=None, action="append")
     run_parser.add_argument("--dot", metavar="PATH", default=DEFAULT_DOT_DIR, type=pathlib.Path, help=f"directory to store generated graphs (default: {DEFAULT_DOT_DIR})")
     run_parser.add_argument("--no-graph", dest="dot", action="store_const", const=None, help=f"do not generate graph")
 
@@ -625,6 +651,7 @@ def main(argv=None) -> int:
 
     nightly_parser.add_argument("tests", metavar="TEST_PATH", default=None, type=pathlib.Path, nargs=1, help="path to single @file with names of all tests to run")
     nightly_parser.add_argument("--models", metavar="MODEL_PATH", dest="models", default=None, type=pathlib.Path, nargs="+")
+    nightly_parser.add_argument("--variants", metavar="VARIANT", dest="variants", default=None, nargs="+", help="list of variant names for each model")
     nightly_parser.add_argument("-out", metavar="DIRNAME", default=_nightly_dirname(), help="name of the nightly dir/tarball (default: nightly-YYYY-MM-DD)")
 
     tar_parser = subparsers.add_parser("tar", help="Make a nightly tarball")
@@ -638,8 +665,7 @@ def main(argv=None) -> int:
 
     if args.command is None:
         parser.print_usage(sys.stderr)
-        print("error: one of {run,nightly,tar} required", file=sys.stderr)
-        sys.exit(1)
+        fail("error: one of {run,nightly,tar} required")
 
     # substitute some mode-specific defaults
     if args.mode is None:
@@ -648,6 +674,17 @@ def main(argv=None) -> int:
         args.model = _default_model[args.mode]
     if hasattr(args, "models") and args.models is None:
         args.models = [_default_model[args.mode]]
+    if not hasattr(args, "variants") or args.variants is None:
+        args.variants = [[]]*len(args.models)
+    else:
+        if len(args.variants) != len(args.models):
+            fail("error: length of --variants must match number of --models")
+        # parse --variants A B C,D into [[A], [B], [C,D]]
+        args.variants = [v.split(",") for v in args.variants]
+        # normalise [["None"]] to [[]]
+        for mi, vs in enumerate(args.variants):
+            if vs == ["None"]:
+                args.variants[mi] = []
     if args.config is None:
         args.config = _default_config[args.mode]
     if TMPDIR is None:
@@ -655,7 +692,6 @@ def main(argv=None) -> int:
             TMPDIR = args.tmpdir
         else:
             TMPDIR = _default_tmpdir[args.mode]
-
 
     runner = Runner()
     try:
