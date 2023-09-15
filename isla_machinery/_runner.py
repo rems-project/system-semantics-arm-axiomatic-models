@@ -43,6 +43,7 @@ import collections
 
 HERE = pathlib.Path(__file__).parent.resolve()
 REMS_DIR = HERE.parent.parent
+HERDTOOLS_DIR = REMS_DIR / "herdtools7-litmus-translator"
 ISLA_DIR = REMS_DIR / "isla"
 
 if "TMPDIR" in os.environ:
@@ -66,6 +67,7 @@ DEFAULT_MODEL_PGTABLE = REMS_DIR / "system-semantics-arm-axiomatic-models" / "mo
 DEFAULT_MODEL_IFETCH = REMS_DIR / "system-semantics-arm-axiomatic-models" / "models" / "aarch64_ifetch.cat"
 DEFAULT_FOOTPRINT = ISLA_DIR / "configs" / "armv9.toml"
 DEFAULT_ISLA_LITMUS = ISLA_DIR / "isla-litmus" / "isla-litmus"
+DEFAULT_LITMUS_TRANSLATOR = HERDTOOLS_DIR / "_build" / "install" / "default" / "bin" / "litmus-translator"
 
 DEFAULT_DOT_DIR = HERE / "dots"
 DEFAULT_TEX_DIR = HERE / "tex"
@@ -148,6 +150,7 @@ async def _run_isla(
         cmd.append(f"--ifetch")
 
     cmd.append(f"--isla-litmus={runner_config.isla_litmus}")
+    cmd.append(f"--litmus-translator={runner_config.litmus_translator}")
 
     if opt:
         cmd.append(opt)
@@ -596,6 +599,7 @@ def _add_common_args(parser):
     parser.add_argument("--arch", metavar="PATH", default=DEFAULT_ARCH, help=f"arch to pass to isla-axiomatic (default: {DEFAULT_ARCH})")
     parser.add_argument("--isla-axiomatic", metavar="PATH", default=DEFAULT_ISLA_AXIOMATIC_PATH, type=pathlib.Path, help=f"path to isla-axiomatic (default: {DEFAULT_ISLA_AXIOMATIC_PATH})")
     parser.add_argument("--isla-litmus", metavar="PATH", default=DEFAULT_ISLA_LITMUS, type=pathlib.Path, help=f"path to isla-litmus (default: {DEFAULT_ISLA_LITMUS})")
+    parser.add_argument("--litmus-translator", metavar="PATH", default=DEFAULT_LITMUS_TRANSLATOR, type=pathlib.Path, help=f"path to litmus-translator (default: {DEFAULT_LITMUS_TRANSLATOR})")
 
     parser.add_argument("--ifetch", dest="mode", action="store_const", const=Mode.IFETCH, help="Run isla-axiomatic with ifetch mode enabled")
     parser.add_argument("--pgtable", dest="mode", action="store_const", const=Mode.PGTABLE, help="Run isla-axiomatic with translation table walks enabled")
