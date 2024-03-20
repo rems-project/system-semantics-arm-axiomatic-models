@@ -1,0 +1,177 @@
+(* ********************************************************************** *)
+(* BSD 2-Clause License                                                   *)
+(*                                                                        *)
+(* Copyright (c) 2022 Alasdair Armstrong                                  *)
+(*                                                                        *)
+(* All rights reserved.                                                   *)
+(*                                                                        *)
+(* Redistribution and use in source and binary forms, with or without     *)
+(* modification, are permitted provided that the following conditions are *)
+(* met:                                                                   *)
+(*                                                                        *)
+(* 1. Redistributions of source code must retain the above copyright      *)
+(* notice, this list of conditions and the following disclaimer.          *)
+(*                                                                        *)
+(* 2. Redistributions in binary form must reproduce the above copyright   *)
+(* notice, this list of conditions and the following disclaimer in the    *)
+(* documentation and/or other materials provided with the distribution.   *)
+(*                                                                        *)
+(* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS    *)
+(* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT      *)
+(* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR  *)
+(* A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT   *)
+(* HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, *)
+(* SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT       *)
+(* LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,  *)
+(* DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY  *)
+(* THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT    *)
+(* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE  *)
+(* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.   *)
+(* ********************************************************************** *)
+
+# enum Regime = {Regime_EL3, Regime_EL30, Regime_EL2, Regime_EL20, Regime_EL10}
+
+accessor tlbi_regime: Regime = .rec.regime
+
+define has_tlbi_regime(ev: Event, reg: Regime): bool =
+    tlbi_regime(ev) == reg
+
+# enum TLBIOp = {
+#   TLBIOp_DALL,
+#   TLBIOp_DASID,
+#   TLBIOp_DVA,
+#   TLBIOp_IALL,
+#   TLBIOp_IASID,
+#   TLBIOp_IVA,
+#   TLBIOp_ALL,
+#   TLBIOp_ASID,
+#   TLBIOp_IPAS2,
+#   TLBIOp_VAA,
+#   TLBIOp_VA,
+#   TLBIOp_VMALL,
+#   TLBIOp_VMALLS12,
+#   TLBIOp_RIPAS2,
+#   TLBIOp_RVAA,
+#   TLBIOp_RVA,
+#   TLBIOp_RPA,
+#   TLBIOp_PAALL
+# }
+
+accessor tlbi_op: TLBIOp = .rec.op
+
+define has_tlbi_op(ev: Event, op: TLBIOp): bool =
+    tlbi_op(ev) == op
+
+# enum Shareability = {Shareability_NSH, Shareability_ISH, Shareability_OSH}
+
+accessor tlbi_shareability: Shareability = .shareability
+
+define has_tlbi_shareability(ev: Event, share: Shareability): bool =
+    tlbi_shareability(ev) == share
+
+accessor tlbi_vmid: bits(16) = .rec.vmid
+accessor tlbi_asid: bits(16) = .rec.asid
+accessor tlbi_address: bits(64) = .rec.address
+
+(* TODO:
+ * these TLBI-* need careful checking, there are lots of TLBIOp and complex combinations
+ *)
+
+(* operation *)
+
+define TLBI-ASID(ev: Event): bool = 
+    TLBI(ev) & (
+          has_tlbi_op(ev, TLBIOp_ASID)
+        | has_tlbi_op(ev, TLBIOp_VA)
+        | has_tlbi_op(ev, TLBIOp_VAA)
+    )
+
+define TLBI-S1(ev: Event): bool = 
+    TLBI(ev) & (
+          has_tlbi_op(ev, TLBIOp_VA)
+        | has_tlbi_op(ev, TLBIOp_VMALLS12)
+        | has_tlbi_op(ev, TLBIOp_VMALL)
+        | has_tlbi_op(ev, TLBIOp_ALL)
+        | has_tlbi_op(ev, TLBIOp_ASID)
+    )
+
+define TLBI-S2(ev: Event): bool = 
+    TLBI(ev) & (
+          has_tlbi_op(ev, TLBIOp_IPAS2)
+        | has_tlbi_op(ev, TLBIOp_VMALLS12)
+        | has_tlbi_op(ev, TLBIOp_VMALL)
+        | has_tlbi_op(ev, TLBIOp_ALL)
+        | has_tlbi_op(ev, TLBIOp_ASID)
+    )
+
+
+define TLBI-VMID(ev: Event): bool = 
+    TLBI(ev) & (
+          has_tlbi_op(ev, TLBIOp_VA)
+        | has_tlbi_op(ev, TLBIOp_VAA)
+        | has_tlbi_op(ev, TLBIOp_IPAS2)
+        | has_tlbi_op(ev, TLBIOp_VMALLS12)
+        | has_tlbi_op(ev, TLBIOp_VMALL)
+        | has_tlbi_op(ev, TLBIOp_ASID)
+    )
+
+define TLBI-VA(ev: Event): bool = 
+    TLBI(ev) & has_tlbi_op(ev, TLBIOp_VA)
+
+define TLBI-IPA(ev: Event): bool = 
+    TLBI(ev) & has_tlbi_op(ev, TLBIOp_IPAS2)
+
+(* regime *)
+
+define TLBI-EL1(ev: Event): bool = 
+    TLBI(ev) & has_tlbi_regime(ev, Regime_EL10)
+
+define TLBI-EL2(ev: Event): bool = 
+    TLBI(ev) & has_tlbi_regime(ev, Regime_EL2)
+
+
+(* shareability *)
+
+define TLBI-IS(ev: Event): bool =
+    TLBI(ev) & (has_tlbi_shareability(ev, Shareability_ISH) | has_tlbi_shareability(ev, Shareability_OSH))
+
+(* read ASID/VMID from the register read *)
+
+set read_VMID
+set read_ASID
+relation same-translation
+
+(*let read_VMID = try read_VMID with emptyset
+let read_ASID = try read_ASID with emptyset
+let same-translation = try same-translation with emptyset*)
+
+define tlbi-to-asid-read(ev1: Event, ev2: Event): bool =
+    TLBI-ASID(ev1) & AT(ev2) & read_ASID(ev2) & (tlbi_asid(ev1) == extract(63, 48, val_of_read_ASID(ev2)))
+
+define tlbi-to-vmid-read(ev1: Event, ev2: Event): bool =
+    TLBI-VMID(ev1) & AT(ev2) & read_VMID(ev2) & (tlbi_vmid(ev1) == extract(63, 48, val_of_read_VMID(ev2)))
+
+(* Currently we only use same-vmid/same-asid between TLBIs and
+ * translates, so this relation defines them in a minimal way.
+ *)
+let tlbi-translate-same-vmid = tlbi-to-vmid-read; [read_VMID]; same-translation
+let tlbi-translate-same-asid = tlbi-to-asid-read; [read_ASID]; same-translation
+
+
+(* for TLBI by address 
+ * this is not quite right... instead we should take note of what the level of the T is
+ * and therefore what range it maps over, to determine if the TLBI affects it.
+ * c.f. InvalidateWide
+ *)
+
+define pageof(addr: bits(64)): bits(36) =
+    extract(47, 12, addr)
+
+define page_overlaps(addr1: bits(64), addr2: bits(64)): bool =
+    pageof(addr1) == pageof(addr2)
+
+define tlbi-translate-same-va-page(ev1: Event, ev2: Event): bool =
+    TLBI-VA(ev1) & T(ev2) & page_overlaps(tlbi_address(ev1), translate_va(ev2))
+
+define tlbi-translate-same-ipa-page(ev1: Event, ev2: Event): bool =
+    TLBI-IPA(ev1) & T(ev2) & page_overlaps(tlbi_address(ev1), translate_ipa(ev2))

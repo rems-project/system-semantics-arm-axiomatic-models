@@ -1,0 +1,6 @@
+variant IDC
+variant DIC
+
+let ifr = (irf^-1; co) & loc
+let ifri = ifr & int
+let ifre = ifr & ext

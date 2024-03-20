@@ -1,0 +1,17 @@
+accessor read_phys_addr: bits(64) = .pa.extz(64)
+accessor write_phys_addr: bits(64) = .pa.extz(64)
+accessor cacheop_phys_addr: bits(64) = .paddress.address.extz(64)
+
+define phys_addr(ev: Event): bits(64) =
+    ite(R(ev), read_phys_addr(ev),
+    ite(IF(ev), read_phys_addr(ev),
+    ite(W(ev), write_phys_addr(ev),
+    ite(is_cacheop(ev), cacheop_phys_addr(ev),
+    0x0000000000000000))))
+
+define same-loc(ev1: Event, ev2: Event): bool =
+    (phys_addr(ev1) == phys_addr(ev2))
+
+let same-cache-line = same-loc
+
+(* TODO: same-icache-line and same-dcache-line which read from IMinLine DMinLine *)

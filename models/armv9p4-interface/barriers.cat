@@ -1,0 +1,137 @@
+(* the three barrier instructions are barriers with the right Arm Barrier kind *)
+
+accessor is_DxB: bool =
+    .match {
+        Barrier_DMB => true,
+        Barrier_DSB => true,
+        _ => false
+    }
+
+accessor z_dmb: bool =
+    .match {
+        Barrier_DMB => true,
+        _ => false
+    }
+
+accessor z_dsb: bool =
+    .match {
+        Barrier_DSB => true,
+        _ => false
+    }
+
+accessor z_isb: bool =
+    .match {
+        Barrier_ISB => true,
+        _ => false
+    }
+
+define DMB(ev: Event): bool =
+    F(ev) & z_dmb(ev)
+
+define DSB(ev: Event): bool =
+    F(ev) & z_dsb(ev)
+
+define ISB(ev: Event): bool =
+    F(ev) & z_isb(ev)
+
+(* Arm barriers can have a domain *)
+# enum MBReqDomain = {
+#   MBReqDomain_Nonshareable,
+#   MBReqDomain_InnerShareable,
+#   MBReqDomain_OuterShareable,
+#   MBReqDomain_FullSystem
+# }
+
+accessor barrier_domain: MBReqDomain = .match {
+    Barrier_DMB => .domain,
+    Barrier_DSB => .domain,
+    _ => default
+}
+
+define has_barrier_domain(ev: Event, d: MBReqDomain): bool =
+    barrier_domain(ev) == d
+
+define ArmBarrierNSH(ev: Event): bool =
+    is_DxB(ev) & has_barrier_domain(ev, MBReqDomain_Nonshareable)
+define ArmBarrierISH(ev: Event): bool =
+    is_DxB(ev) & has_barrier_domain(ev, MBReqDomain_InnerShareable)
+define ArmBarrierOSH(ev: Event): bool =
+    is_DxB(ev) & has_barrier_domain(ev, MBReqDomain_OuterShareable)
+define ArmBarrierSY(ev: Event): bool =
+    is_DxB(ev) & has_barrier_domain(ev, MBReqDomain_FullSystem)
+
+(* Arm barriers can have types *)
+# enum MBReqTypes = {MBReqTypes_Reads, MBReqTypes_Writes, MBReqTypes_All}
+
+accessor barrier_types: MBReqTypes = .match {
+    Barrier_DMB => .types,
+    Barrier_DSB => .types,
+    _ => default
+}
+
+define has_barrier_type(ev: Event,t: MBReqTypes): bool =
+    (barrier_types(ev) == t)
+
+define ArmBarrierRM(ev: Event): bool =
+    is_DxB(ev) & has_barrier_type(ev, MBReqTypes_Reads)
+define ArmBarrierWW(ev: Event): bool =
+    is_DxB(ev) & has_barrier_type(ev, MBReqTypes_Writes)
+define ArmBarrierMM(ev: Event): bool =
+    is_DxB(ev) & has_barrier_type(ev, MBReqTypes_All)
+
+(* individual barrier instructions *)
+
+define DMBLD(ev: Event): bool = DMB(ev) & ArmBarrierRM(ev)
+define DMBST(ev: Event): bool = DMB(ev) & ArmBarrierWW(ev)
+define DMBNSH(ev: Event): bool = DMB(ev) & ArmBarrierMM(ev) & ArmBarrierNSH(ev)
+define DMBISH(ev: Event): bool = DMB(ev) & ArmBarrierMM(ev) & ArmBarrierISH(ev)
+define DMBOSH(ev: Event): bool = DMB(ev) & ArmBarrierMM(ev) & ArmBarrierOSH(ev)
+define DMBNSHST(ev: Event): bool = DMB(ev) & ArmBarrierWW(ev) & ArmBarrierNSH(ev)
+define DMBISHST(ev: Event): bool = DMB(ev) & ArmBarrierWW(ev) & ArmBarrierISH(ev)
+define DMBOSHST(ev: Event): bool = DMB(ev) & ArmBarrierWW(ev) & ArmBarrierOSH(ev)
+define DMBNSHLD(ev: Event): bool = DMB(ev) & ArmBarrierRM(ev) & ArmBarrierNSH(ev)
+define DMBISHLD(ev: Event): bool = DMB(ev) & ArmBarrierRM(ev) & ArmBarrierISH(ev)
+define DMBOSHLD(ev: Event): bool = DMB(ev) & ArmBarrierRM(ev) & ArmBarrierOSH(ev)
+define DMBSY(ev: Event): bool = DMB(ev) & ArmBarrierMM(ev) & ArmBarrierSY(ev)
+
+define DSBLD(ev: Event): bool = DSB(ev) & ArmBarrierRM(ev)
+define DSBST(ev: Event): bool = DSB(ev) & ArmBarrierWW(ev)
+define DSBNSH(ev: Event): bool = DSB(ev) & ArmBarrierMM(ev) & ArmBarrierNSH(ev)
+define DSBISH(ev: Event): bool = DSB(ev) & ArmBarrierMM(ev) & ArmBarrierISH(ev)
+define DSBOSH(ev: Event): bool = DSB(ev) & ArmBarrierMM(ev) & ArmBarrierOSH(ev)
+define DSBNSHST(ev: Event): bool = DSB(ev) & ArmBarrierWW(ev) & ArmBarrierNSH(ev)
+define DSBISHST(ev: Event): bool = DSB(ev) & ArmBarrierWW(ev) & ArmBarrierISH(ev)
+define DSBOSHST(ev: Event): bool = DSB(ev) & ArmBarrierWW(ev) & ArmBarrierOSH(ev)
+define DSBNSHLD(ev: Event): bool = DSB(ev) & ArmBarrierRM(ev) & ArmBarrierNSH(ev)
+define DSBISHLD(ev: Event): bool = DSB(ev) & ArmBarrierRM(ev) & ArmBarrierISH(ev)
+define DSBOSHLD(ev: Event): bool = DSB(ev) & ArmBarrierRM(ev) & ArmBarrierOSH(ev)
+define DSBSY(ev: Event): bool = DSB(ev) & ArmBarrierMM(ev) & ArmBarrierSY(ev)
+
+(* barrier hierarchy *)
+
+define dsbsy(ev: Event): bool =
+    DSBISH(ev) | DSBSY(ev) | DSBNSH(ev)
+
+define dsbst(ev: Event): bool =
+    dsbsy(ev) | DSBST(ev) | DSBISHST(ev) | DSBNSHST(ev)
+
+define dsbld(ev: Event): bool =
+    dsbsy(ev) | DSBLD(ev) | DSBISHLD(ev) | DSBNSHLD(ev)
+
+define dsbnsh(ev: Event): bool =
+    DSBNSH(ev)
+
+define dmbsy(ev: Event): bool =
+    dsbsy(ev) | DMBSY(ev) | DMBISH(ev) | DMBNSH(ev)
+
+define dmbst(ev: Event): bool =
+    dmbsy(ev) | dsbst(ev) | DMBST(ev) | DSBST(ev) | DSBISHST(ev) | DSBNSHST(ev)
+
+define dmbld(ev: Event): bool =
+    dmbsy(ev) | dsbld(ev) | DMBLD(ev) | DSBISHLD(ev) | DSBNSHLD(ev)
+
+define dmb(ev: Event): bool =
+    dmbsy(ev) | dmbst(ev) | dmbld(ev)
+
+define dsb(ev: Event): bool =
+    dsbsy(ev) | dsbst(ev) | dsbld(ev)

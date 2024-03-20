@@ -1,0 +1,13 @@
+(* generic interface *)
+include "interface-common.cat"
+
+(* arch specific *)
+include "armv9p3-interface/addresses.cat"
+include "armv9p3-interface/barriers.cat"
+include "armv9p3-interface/regs.cat"
+(* include "armv9p3-interface/tlbi.cat" *)
+include "armv9p3-interface/wco.cat"
+(* include "armv9p3-interface/translation.cat" *)
+include "armv9p3-interface/exceptions.cat"
+include "armv9p3-interface/ifetch.cat"
+include "armv9p3-interface/cacheops.cat"

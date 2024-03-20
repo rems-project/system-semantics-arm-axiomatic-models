@@ -1,3 +1,15 @@
+relation iio
+relation po
+relation fpo
+relation rf
+relation co
+relation addr
+relation ctrl
+relation data
+relation rmw
+relation po-loc
+show iio, po, rf, co, addr, ctrl, data, rmw, po-loc
+
 (* F for all fences *)
 accessor F: bool = is sail_barrier
 

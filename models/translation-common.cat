@@ -1,6 +1,5 @@
-(* only include the tlbi interface stuff if actually using --pgtable *)
-include "armv9-interface/tlbi.cat"
-include "armv9-interface/translation.cat"
+(* include Arm-specific interface *)
+include "arm-translation.cat"
 
 (* For each instruction, for each read performed by the translation
    table walk ASL code, we generate one translate-read (T) event. If
@@ -22,7 +21,6 @@ define W_invalid(ev: Event): bool = W(ev) & has_even_value(ev)
 (* A write of a valid descriptor (an odd value) is in W_valid *)
 define W_valid(ev: Event): bool = W(ev) & ~W_invalid(ev)
 
-relation iio
 relation instruction-order
 
 (* e1 speculative e2

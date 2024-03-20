@@ -59,15 +59,51 @@ else:
 # +--system-semantics-arm-axiomatic-models/
 # +--+--models/
 DEFAULT_ISLA_AXIOMATIC_PATH = ISLA_DIR / "target" / "release" / "isla-axiomatic"
-DEFAULT_ARCH = REMS_DIR / "isla-snapshots" / "armv9.ir"
-DEFAULT_CONFIG = ISLA_DIR / "configs" / "armv9.toml"
-DEFAULT_CONFIG_PGTABLE = ISLA_DIR / "configs" / "armv9_mmu_on.toml"
+DEFAULT_SNAPSHOTS_DIR = REMS_DIR / "isla-snapshots"
+DEFAULT_CONFIG_PATH = ISLA_DIR / "configs"
 DEFAULT_MODEL = REMS_DIR / "system-semantics-arm-axiomatic-models" / "models" / "aarch64_base.cat"
 DEFAULT_MODEL_PGTABLE = REMS_DIR / "system-semantics-arm-axiomatic-models" / "models" / "aarch64_mmu_strong_ETS.cat"
 DEFAULT_MODEL_IFETCH = REMS_DIR / "system-semantics-arm-axiomatic-models" / "models" / "aarch64_ifetch.cat"
-DEFAULT_FOOTPRINT = ISLA_DIR / "configs" / "armv9.toml"
 DEFAULT_ISLA_LITMUS = ISLA_DIR / "isla-litmus" / "isla-litmus"
 DEFAULT_LITMUS_TRANSLATOR = HERDTOOLS_DIR / "_build" / "install" / "default" / "bin" / "litmus-translator"
+
+DEFAULT_ISLA_VERSION = "arm9.3"
+
+ISLA_CONFIG_VERSIONS = {
+    "arm9.3": DEFAULT_CONFIG_PATH / "armv9p3.toml",
+    "arm9.3-mmu": DEFAULT_CONFIG_PATH / "armv9p3_mmu_on.toml",
+    "arm9.4": DEFAULT_CONFIG_PATH / "armv9p4.toml",
+}
+
+ISLA_FOOTPRINT_CONFIG_VERSIONS = {
+    "arm9.3": DEFAULT_CONFIG_PATH / "armv9p3.toml",
+    "arm9.3-mmu": DEFAULT_CONFIG_PATH / "armv9p3.toml",
+    "arm9.4": DEFAULT_CONFIG_PATH / "armv9p4.toml",
+}
+
+ISLA_SNAPSHOT_VERSIONS = {
+    "arm9.3": DEFAULT_SNAPSHOTS_DIR / "armv9p3.ir",
+    "arm9.3-mmu": DEFAULT_SNAPSHOTS_DIR / "armv9p3.ir",
+    "arm9.4": DEFAULT_SNAPSHOTS_DIR / "armv9p4.ir",
+}
+
+ISLA_DEBUG_PROBES = {
+    "arm9.3": [
+        "AArch64_TakeReset",
+        "__FetchNextInstr",
+        "BranchTo",
+        "AArch64_TakeException",
+        "PC_read",
+        "__ExecuteInstr",
+    ],
+    "arm9.4": [
+        "AArch64_TakeReset",
+        "__FetchInstr",
+        "__DecodeExecute",
+        "BranchTo",
+        "AArch64_TakeException",
+    ]
+}
 
 DEFAULT_DOT_DIR = HERE / "dots"
 DEFAULT_TEX_DIR = HERE / "tex"
@@ -90,12 +126,6 @@ _default_model = {
     Mode.PGTABLE: DEFAULT_MODEL_PGTABLE,
 }
 
-_default_config = {
-    Mode.DATA: DEFAULT_CONFIG,
-    Mode.IFETCH: DEFAULT_CONFIG,
-    Mode.PGTABLE: DEFAULT_CONFIG_PGTABLE,
-}
-
 _default_tmpdir = {
     Mode.DATA: HERE / "_tmp",
     Mode.IFETCH: HERE / "_tmp",
@@ -103,13 +133,13 @@ _default_tmpdir = {
 }
 
 async def _run_isla(
-    litmus_test: "LitmusTest",
+    litmus_test: "TestFile",
     *extra,
     mode=DEFAULT_MODE,
     isla_path=DEFAULT_ISLA_AXIOMATIC_PATH,
-    arch=DEFAULT_ARCH,
-    config=DEFAULT_CONFIG,
-    footprint_config=DEFAULT_FOOTPRINT,
+    arch=None,
+    config=None,
+    footprint_config=None,
     model=DEFAULT_MODEL,
     variants=None,
     opt=DEFAULT_OPT,
@@ -123,7 +153,7 @@ async def _run_isla(
     if verbose then passes through to stdout too.
     """
 
-    logf: pathlib.Path = TMPDIR / litmus_test.name / _model_name(model)
+    logf: pathlib.Path = TMPDIR / litmus_test.src_path.name / _model_name(model)
     logf = logf.with_suffix(".log")
 
     cmd = []
@@ -160,6 +190,8 @@ async def _run_isla(
 
     if dot_dir is not None:
         cmd.append(f"--dot={dot_dir}")
+
+    cmd.append(f"--graph={runner_config.graph}")
 
     if not runner_config.generate_output_model:
         cmd.append("--no-z3-model")
@@ -206,8 +238,8 @@ async def _run_isla(
                 stdout.append(line.decode())
 
                 f.write(line)
-                if runner_config.verbose:
-                    print(line.decode())
+                if not runner_config.batch or runner_config.verbose:
+                    print(line.decode(), flush=True)
 
     if runner_config.verbose:
         env_str = " ".join(f"{e}={v}" for (e,v) in env.items())
@@ -217,7 +249,7 @@ async def _run_isla(
     # stuff os.environ in there too
     env = {**os.environ, **env}
 
-    if not runner_config.gdb or generate_latex_only:
+    if (not runner_config.gdb or generate_latex_only) and runner_config.batch:
         STDOUT = asyncio.subprocess.PIPE
     else:
         STDOUT = None
@@ -299,81 +331,25 @@ async def _compile_dot(
     await proc.wait()
 
 async def _compile_dots(
-    litmus_test: "LitmusTest",
     dot_dir: pathlib.Path,
     runner_config,
 ) -> None:
     for f in dot_dir.iterdir():
-        m = re.fullmatch(rf"{re.escape(litmus_test.name)}\_allow\_\d+.dot", f.name)
-        if m is not None:
+        if f.suffix == ".dot":
             await _compile_dot(f, runner_config=runner_config)
 
 class LitmusError(Exception):
     pass
 
-class LitmusTest:
-    name: str
+class TestFile:
+    """ a .litmus or .litmus.toml or @file
+    """
     src_path: pathlib.Path
 
-    def __init__(self, name: str, src_path: pathlib.Path):
-        self.name = name
+    def __init__(self, src_path: pathlib.Path):
         self.src_path = src_path
 
-    @classmethod
-    def from_path(cls, p, allow_bad_names=False):
-        """ check the path `p` exists and is the right format before creating a `LitmusTest` object.
-        """
-        if not p.exists():
-            raise LitmusError(f"Test {p} does not exist")
-
-        required_suffixes = [".litmus.toml", ".litmus"]
-        for suffix in required_suffixes:
-            if p.name[-len(suffix):] == suffix:
-                break
-        else:
-            raise LitmusError(
-                f"Test {p} does not appear to be one of: {required_suffixes}"
-            )
-
-        test_name_from_filename = p.name[:-len(suffix)]
-
-        # sanity check the name matches the name without the .litmus.toml
-        # instead of depending on toml just read that name="..." field
-        if suffix == ".litmus.toml":
-            content = p.read_text()
-            m = re.search(r"name\s*=\s*[\'\"](?P<name>.*)[\'\"]", content)
-            if m is None:
-                raise LitmusError(f"Could not find [name] for test {p}")
-
-            test_name_from_toml = m["name"]
-
-            if test_name_from_filename != test_name_from_toml:
-                msg = f"Test {p} has different name {test_name_from_toml!r} in file"
-                if not allow_bad_names:
-                    raise LitmusError(f"{msg} (pass --allow-bad-names to continue anyway)")
-                else:
-                    print(msg, file=sys.stderr)
-
-        return cls(test_name_from_filename, p)
-
-    @classmethod
-    def from_collection_path(cls, p, allow_bad_names=False):
-        content = p.read_text()
-        for line in content.splitlines():
-            if line.strip():
-                yield from cls.tests_from_test_file(p.parent / line, allow_bad_names=allow_bad_names)
-
-    @classmethod
-    def tests_from_test_file(cls, test_path, allow_bad_names=False):
-        if test_path.stem[0] == "@":
-            yield from cls.from_collection_path(test_path, allow_bad_names=allow_bad_names)
-        else:
-            try:
-                yield cls.from_path(test_path, allow_bad_names=allow_bad_names)
-            except LitmusError as e:
-                print(e, file=sys.stderr)
-
-    async def run(self, config) -> Result:
+    async def run(self, config) -> "Result | None":
         extra = []
 
         for ea in config.extraargs:
@@ -390,6 +366,7 @@ class LitmusTest:
                 isla_path=config.isla_axiomatic,
                 arch=config.arch,
                 config=config.config,
+                footprint_config=config.footprint_config,
                 opt=config.optimize,
                 generate_latex_only=True,
                 runner_config=config,
@@ -407,14 +384,12 @@ class LitmusTest:
             debug_args += "".join(config.debug_args)
 
             extra.extend(["-D", debug_args])
-            probes = [
-                "__FetchNextInstr",
-                "BranchTo",
-                "AArch64_TakeException",
-                "PC_read",
-                "__ExecuteInstr",
-                *config.probes,
-            ]
+            probes = []
+
+            if config.arch_version is not None:
+                probes.extend(ISLA_DEBUG_PROBES[config.arch_version])
+
+            probes.extend(config.probes)
 
             for p in probes:
                 extra.extend(["--probe", p])
@@ -435,6 +410,7 @@ class LitmusTest:
             isla_path=config.isla_axiomatic,
             arch=config.arch,
             config=config.config,
+            footprint_config=config.footprint_config,
             model=config.model,
             variants=config.variant,
             opt=config.optimize,
@@ -442,9 +418,6 @@ class LitmusTest:
             runner_config=config,
             *extra,
         )
-
-        if config.dot is not None:
-            await _compile_dots(self, dot_dir=config.dot, runner_config=config)
 
         return res
 
@@ -505,13 +478,15 @@ class Runner:
             fname = f"{fname}_{variants}"
         return (nightly_tmp_dir / fname).with_suffix(".txt")
 
-    async def _run_all(self, tests, args):
+    async def _run(self, test, args):
         for model, variants in zip(args.models, args.variants):
-            for t in tests:
-                args.model = model
-                args.variant = variants
-                res = await t.run(args)
-                yield (model, variants, t, res)
+            args.model = model
+            args.variant = variants
+            res = await test.run(args)
+            yield (model, variants, test, res)
+
+        if args.dot is not None:
+            await _compile_dots(dot_dir=args.dot, runner_config=args)
 
     async def run_tests(self, args) -> None:
         try:
@@ -521,25 +496,19 @@ class Runner:
                 if args.dot and not args.dot.exists():
                     args.dot.mkdir(parents=True, exist_ok=True)
 
-                tests = []
-                for test_path in args.tests:
-                    tests.extend(LitmusTest.tests_from_test_file(test_path, allow_bad_names=args.allow_bad_names))
-                results = self._run_all(tests, args)
+                results = self._run(TestFile(args.test_file), args)
 
                 async for model, variants, test, result in results:
-                    if variants:
-                        variants = ",".join(variants)
-                        print(f"{model}({variants})\t{test.name},{result.name}")
-                    else:
-                        print(f"{model}\t{test.name},{result.name}")
+                    # in the non-batch case, we just pipe isla-axiomatic output direct to user
+                    if args.batch:
+                        if variants:
+                            variants = ",".join(variants)
+                            print(f"{model}({variants})\t{test.name},{result.name}")
+                        else:
+                            print(f"{model}\t{test.name},{result.name}")
             # if nightly build then collect up results into tarball
             elif args.command == "nightly":
                 nightly_tmp_dirname = args.out
-
-                # collect tests
-                tests = []
-                for test_path in args.tests:
-                    tests.extend(LitmusTest.tests_from_test_file(test_path, allow_bad_names=args.allow_bad_names))
 
                 nightly_tmp = TMPDIR / nightly_tmp_dirname
                 nightly_tmp.mkdir(parents=True)  # if exists, raise error.
@@ -562,7 +531,7 @@ class Runner:
                     model_results_path = self._mk_model_results_filename(nightly_tmp, model_name, variants)
                     model_results_path.write_text("")
 
-                results = self._run_all(tests, args)
+                results = self._run(TestFile(args.test_file), args)
 
                 async for model, variants, test, result in results:
                     model_name = _model_name(model)
@@ -595,8 +564,13 @@ class Runner:
 
 def _add_common_args(parser):
     # shared configuration
-    parser.add_argument("--config", metavar="PATH", default=None, help=f"config to pass to isla-axiomatic (default: {DEFAULT_CONFIG})")
-    parser.add_argument("--arch", metavar="PATH", default=DEFAULT_ARCH, help=f"arch to pass to isla-axiomatic (default: {DEFAULT_ARCH})")
+
+    # can pass --arch and --config instead to override default --arch-version
+    parser.add_argument("--arch-version", metavar="VERSION", default=None, help=f"architecture version to use (default: {DEFAULT_ISLA_VERSION})")
+    parser.add_argument("--arch", metavar="PATH", help=f"override architecture snapshot to pass to isla-axiomatic")
+    parser.add_argument("--config", metavar="PATH", default=None, help=f"override config to pass to isla-axiomatic")
+    parser.add_argument("--footprint-config", metavar="PATH", default=None, help=f"override config to pass to isla-axiomatic to use for footprint analysis")
+
     parser.add_argument("--isla-axiomatic", metavar="PATH", default=DEFAULT_ISLA_AXIOMATIC_PATH, type=pathlib.Path, help=f"path to isla-axiomatic (default: {DEFAULT_ISLA_AXIOMATIC_PATH})")
     parser.add_argument("--isla-litmus", metavar="PATH", default=DEFAULT_ISLA_LITMUS, type=pathlib.Path, help=f"path to isla-litmus (default: {DEFAULT_ISLA_LITMUS})")
     parser.add_argument("--litmus-translator", metavar="PATH", default=DEFAULT_LITMUS_TRANSLATOR, type=pathlib.Path, help=f"path to litmus-translator (default: {DEFAULT_LITMUS_TRANSLATOR})")
@@ -607,9 +581,9 @@ def _add_common_args(parser):
     # enable/disable isla-axiomatic optimizations
     parser.add_argument("--optimize", metavar="ARG", default=DEFAULT_OPT, help=f"command to pass to isla-axiomatic (default: {DEFAULT_OPT!r})")
     parser.add_argument("--no-optimize", dest="optimize", action="store_const", const=None)
-    parser.add_argument("--probes", metavar="PROBES", nargs="*", default=[], help=f"additional --probe commands to isla")
+    parser.add_argument("--probe", dest="probes", metavar="PROBE", action="append", help=f"additional --probe commands to isla")
     parser.add_argument("--debug-args", metavar="D", nargs="*", default=[], help=f"additional -D commands to isla")
-    parser.add_argument("--default-isla-args", default="--graph-human-readable")
+    parser.add_argument("--default-isla-args", default="")
     parser.add_argument("--no-default-isla-args", dest="default-args", action="store_const", const="")
     parser.add_argument("--extraargs", help="extra arguments to pass directly to `isla-axiomatic`", action="append", default=[])
     parser.add_argument("--no-output-model", dest="generate_output_model", action="store_false", help=f"do not generate output model")
@@ -625,6 +599,8 @@ def _add_common_args(parser):
     parser.add_argument("--allow-bad-names", action="store_true", default=False, help="Allow mismatched names between file and [name] attribute")
 
     parser.add_argument("--tmpdir", metavar="PATH", default=None, type=pathlib.Path, help=f"$TMPDIR override (current: {TMPDIR})")
+
+    parser.add_argument("--batch", action="store_true", default=False, help="Run in batch mode")
 
 
 def fail(msg):
@@ -646,14 +622,15 @@ def main(argv=None) -> int:
     run_parser.add_argument("--variant", metavar="VARIANT", dest="variants", default=None, action="append")
     run_parser.add_argument("--dot", metavar="PATH", default=DEFAULT_DOT_DIR, type=pathlib.Path, help=f"directory to store generated graphs (default: {DEFAULT_DOT_DIR})")
     run_parser.add_argument("--no-graph", dest="dot", action="store_const", const=None, help=f"do not generate graph")
+    run_parser.add_argument("--graph", action="store", default="ascii", choices=["ascii", "dot", "none"])
 
     # tests passed positionally
-    run_parser.add_argument("tests", metavar="TEST_PATH", type=pathlib.Path, nargs="*", help="paths to .litmus or .litmus.toml files to run")
+    run_parser.add_argument("test_file", metavar="TEST_PATH", type=pathlib.Path, help="path to .litmus or .litmus.toml or @all file to run")
 
     nightly_parser = subparsers.add_parser("nightly", help="Run a batched nightly run")
     _add_common_args(nightly_parser)
 
-    nightly_parser.add_argument("tests", metavar="TEST_PATH", default=None, type=pathlib.Path, nargs=1, help="path to single @file with names of all tests to run")
+    nightly_parser.add_argument("test_file", metavar="TEST_PATH", default=None, type=pathlib.Path, help="path to single @file with names of all tests to run")
     nightly_parser.add_argument("--models", metavar="MODEL_PATH", dest="models", default=None, type=pathlib.Path, nargs="+")
     nightly_parser.add_argument("--variants", metavar="VARIANT", dest="variants", default=None, nargs="+", help="list of variant names for each model")
     nightly_parser.add_argument("-out", metavar="DIRNAME", default=_nightly_dirname(), help="name of the nightly dir/tarball (default: nightly-YYYY-MM-DD)")
@@ -665,7 +642,10 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     # collect comma-separated probes
-    args.probes = [p for pr in args.probes for p in pr.split(",")]
+    if args.probes is None:
+        args.probes = []
+    else:
+        args.probes = [p for pr in args.probes for p in pr.split(",")]
 
     if args.command is None:
         parser.print_usage(sys.stderr)
@@ -689,8 +669,28 @@ def main(argv=None) -> int:
         for mi, vs in enumerate(args.variants):
             if vs == ["None"]:
                 args.variants[mi] = []
-    if args.config is None:
-        args.config = _default_config[args.mode]
+
+    # --arch-version and --arch/--config are mutually exclusive
+    if args.arch_version is not None and (args.arch is not None or args.config is not None):
+        fail("error: --arch and --config are mutually exclusive with --arch-version")
+    elif args.arch_version is None and ((args.arch is not None) ^ (args.config is not None)):
+        fail("error: both --arch and --config must be supplied, or neither.")
+
+    if "graph" not in args:
+        args.graph = "none"
+
+    # if no --arch or --config, then use --arch-version
+    if args.arch is None and args.config is None:
+        if args.arch_version is None:
+            args.arch_version = DEFAULT_ISLA_VERSION
+
+        if args.mode == Mode.PGTABLE:
+            args.arch_version += "-mmu"
+
+        args.arch = ISLA_SNAPSHOT_VERSIONS[args.arch_version]
+        args.config = ISLA_CONFIG_VERSIONS[args.arch_version]
+        args.footprint_config = ISLA_FOOTPRINT_CONFIG_VERSIONS[args.arch_version]
+
     if TMPDIR is None:
         if args.tmpdir is not None:
             TMPDIR = args.tmpdir

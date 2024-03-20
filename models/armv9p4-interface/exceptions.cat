@@ -1,0 +1,107 @@
+# enum Fault = {
+#   Fault_None,
+#   Fault_AccessFlag,
+#   Fault_Alignment,
+#   Fault_Background,
+#   Fault_Domain,
+#   Fault_Permission,
+#   Fault_Translation,
+#   Fault_AddressSize,
+#   Fault_SyncExternal,
+#   Fault_SyncExternalOnWalk,
+#   Fault_SyncParity,
+#   Fault_SyncParityOnWalk,
+#   Fault_GPCFOnWalk,
+#   Fault_GPCFOnOutput,
+#   Fault_AsyncParity,
+#   Fault_AsyncExternal,
+#   Fault_Debug,
+#   Fault_TLBConflict,
+#   Fault_BranchTarget,
+#   Fault_HWUpdateAccessFlag,
+#   Fault_Lockdown,
+#   Fault_Exclusive,
+#   Fault_ICacheMaint
+# }
+
+# enum AccType = {
+#   AccType_NORMAL,
+#   AccType_STREAM,
+#   AccType_VEC,
+#   AccType_VECSTREAM,
+#   AccType_SVE,
+#   AccType_SVESTREAM,
+#   AccType_SME,
+#   AccType_SMESTREAM,
+#   AccType_UNPRIVSTREAM,
+#   AccType_A32LSMD,
+#   AccType_ATOMIC,
+#   AccType_ATOMICRW,
+#   AccType_ORDERED,
+#   AccType_ORDEREDRW,
+#   AccType_ORDEREDATOMIC,
+#   AccType_ORDEREDATOMICRW,
+#   AccType_ATOMICLS64,
+#   AccType_LIMITEDORDERED,
+#   AccType_UNPRIV,
+#   AccType_IFETCH,
+#   AccType_TTW,
+#   AccType_NONFAULT,
+#   AccType_CNOTFIRST,
+#   AccType_NV2REGISTER,
+#   AccType_DC,
+#   AccType_IC,
+#   AccType_DCZVA,
+#   AccType_ATPAN,
+#   AccType_AT
+# }
+
+accessor fault_type: Fault =
+    .match {
+        Some => .statuscode,
+        _ => default
+    }
+
+accessor acc_type: AccType =
+    .match {
+        Some => .acctype,
+        _ => default
+    }
+
+accessor is_from_write: bool =
+    .match {
+        Some => .write,
+        _ => false
+    }
+
+accessor is_fault: bool =
+    .match {
+        Some => true,
+        _ => false
+    }
+
+(* A Fault is an exception with a FaultRecord *)
+define Fault(ev: Event): bool =
+    TE(ev) & is_fault(ev)
+
+define IsTranslationFault(ev: Event): bool =
+  Fault(ev) & (fault_type(ev) == Fault_Translation)
+
+define IsPermissionFault(ev: Event): bool =
+  Fault(ev) & (fault_type(ev) == Fault_Permission)
+
+(* [Fault_T] is a translation fault and [Fault_P] is a permission fault *)
+define Fault_T(ev: Event): bool = Fault(ev) & IsTranslationFault(ev)
+define Fault_P(ev: Event): bool = Fault(ev) & IsPermissionFault(ev)
+
+define FaultFromR(ev: Event): bool =
+    Fault(ev) & ~is_from_write(ev)
+
+define FaultFromW(ev: Event): bool =
+    Fault(ev) & is_from_write(ev)
+
+define FaultFromAcquireR(ev: Event): bool =
+    Fault(ev) & ~is_from_write(ev) & (acc_type(ev) == AccType_ORDERED)
+
+define FaultFromReleaseW(ev: Event): bool =
+    Fault(ev) & is_from_write(ev) & (acc_type(ev) == AccType_ORDERED)

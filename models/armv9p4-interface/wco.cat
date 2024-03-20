@@ -1,0 +1,38 @@
+declare wco(Event, Event): bool
+
+(* wco has domain and range of W,C *)
+assert forall ev1: Event, ev2: Event =>
+    wco(ev1, ev2) -->
+    (W(ev1) | C(ev1) | (ev1 == IW)) & (W(ev2) | C(ev2))
+
+(* wco is transitive *)
+assert forall ev1: Event, ev2: Event, ev3: Event =>
+    wco(ev1, ev2) & wco(ev2, ev3) --> wco(ev1, ev3)
+
+(* wco is total *)
+assert forall ev1: Event, ev2: Event, ev3: Event =>
+    wco(ev1, ev3) & wco(ev2, ev3) & ~(ev1 == ev2) -->
+    wco(ev1, ev2) | wco(ev2, ev1)
+
+(* wco is irreflexive *)
+assert forall ev1: Event, ev2: Event, ev3: Event =>
+    wco(ev1, ev2) --> ~(ev1 == ev2)
+
+(* wco is antisymmetric *)
+assert forall ev1: Event, ev2: Event =>
+    wco(ev1, ev2) --> ~wco(ev2, ev1)
+
+(* all write/cache-op pairs are wco related *)
+assert forall ev1: Event, ev2: Event =>
+    W(ev1) & C(ev2) -->
+    wco(ev1, ev2) | wco(ev2, ev1)
+
+(* wco is consistent with co *)
+assert forall ev1: Event, ev2: Event =>
+    co(ev1, ev2) --> wco(ev1, ev2)
+
+(* all C are wco after IW
+ * n.b. all W are wco after IW, because all W are co after IW and co => wco
+ *)
+assert forall ev: Event =>
+    C(ev) --> wco(IW, ev)
