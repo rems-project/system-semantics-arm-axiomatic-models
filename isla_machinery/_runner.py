@@ -25,6 +25,7 @@ aarch64_mmu_strong_ETS.cat  MP+pos  Allow
 """
 
 import os
+import io
 import re
 import ast
 import csv
@@ -135,6 +136,7 @@ _default_tmpdir = {
 async def _run_isla(
     litmus_test: "TestFile",
     *extra,
+    outf: io.TextIOBase,
     mode=DEFAULT_MODE,
     isla_path=DEFAULT_ISLA_AXIOMATIC_PATH,
     arch=None,
@@ -146,15 +148,15 @@ async def _run_isla(
     dot_dir: pathlib.Path = None,
     generate_latex_only: bool = False,
     runner_config,
-) -> "Result | None":
+) -> int:
     """run isla-axiomatic on the litmus test
 
     passes output to a .log file in the TMPDIR for this test+model combination
     if verbose then passes through to stdout too.
     """
 
-    logf: pathlib.Path = TMPDIR / litmus_test.src_path.name / _model_name(model)
-    logf = logf.with_suffix(".log")
+    # logf: pathlib.Path = TMPDIR / litmus_test.src_path.name / _model_name(model)
+    # logf = logf.with_suffix(".log")
 
     cmd = []
 
@@ -227,19 +229,17 @@ async def _run_isla(
             return
 
         nonlocal stdout
-        logf.parent.mkdir(parents=True, exist_ok=True)
-        with logf.open("wb") as f:
-            while True:
-                line = await stream.readline()
+        while True:
+            line = await stream.readline()
 
-                if line == b"":
-                    break
+            if line == b"":
+                break
 
-                stdout.append(line.decode())
+            stdout.append(line.decode())
 
-                f.write(line)
-                if not runner_config.batch or runner_config.verbose:
-                    print(line.decode(), flush=True)
+            outf.write(line)
+            if not runner_config.batch or runner_config.verbose:
+                print(line.decode(), flush=True)
 
     if runner_config.verbose:
         env_str = " ".join(f"{e}={v}" for (e,v) in env.items())
@@ -266,46 +266,13 @@ async def _run_isla(
         except:
             pass
     CURRENTLY_RUNNING_ISLA_INSTANCES.remove(proc)
-    if generate_latex_only:
-        return None
-    else:
-        return Result.from_isla_stdout_postfix(proc.returncode, stdout)
+    return proc.returncode
 
 def _model_name(model_path):
     """given a path to a model.toml file
     extract the name of the model
     """
     return model_path.stem
-
-class Result(enum.Enum):
-    Allow = enum.auto()
-    Forbid = enum.auto()
-    Error = enum.auto()
-    IslaCrash = enum.auto()
-    IslaEmpty = enum.auto()
-
-    @classmethod
-    def from_str(cls, s):
-        if s == "allowed":
-            return cls.Allow
-        elif s == "forbidden":
-            return cls.Forbid
-        elif s == "error":
-            return cls.Error
-        else:
-            raise ValueError(f"Unknown result state {s!r}")
-
-    @classmethod
-    def from_isla_stdout_postfix(cls, returncode, stdout_postfix: "list[str]"):
-        if returncode != 0:
-            return cls.IslaCrash
-        elif stdout_postfix:
-            final_line = stdout_postfix[-1]
-
-            name, state, *_ = final_line.split(" ")
-            return cls.from_str(state)
-        else:
-            return cls.IslaEmpty
 
 async def _compile_dot(
     dot_path: pathlib.Path,
@@ -349,7 +316,7 @@ class TestFile:
     def __init__(self, src_path: pathlib.Path):
         self.src_path = src_path
 
-    async def run(self, config) -> "Result | None":
+    async def run(self, config, outf) -> int:
         extra = []
 
         for ea in config.extraargs:
@@ -362,6 +329,7 @@ class TestFile:
         if config.generate_latex:
             await _run_isla(
                 self,
+                outf=outf,
                 mode=config.mode,
                 isla_path=config.isla_axiomatic,
                 arch=config.arch,
@@ -406,6 +374,7 @@ class TestFile:
         # run again to get the actual results
         res = await _run_isla(
             self,
+            outf=outf,
             mode=config.mode,
             isla_path=config.isla_axiomatic,
             arch=config.arch,
@@ -478,34 +447,35 @@ class Runner:
             fname = f"{fname}_{variants}"
         return (nightly_tmp_dir / fname).with_suffix(".txt")
 
-    async def _run(self, test, args):
+    async def _run(self, test: TestFile, args, log_prefix):
         for model, variants in zip(args.models, args.variants):
+            outf_path = (log_prefix / ("_".join(variants))).with_suffix(".log")
             args.model = model
             args.variant = variants
-            res = await test.run(args)
-            yield (model, variants, test, res)
+            outf_path.parent.mkdir(exist_ok=True, parents=True)
+            with outf_path.open("w") as f:
+                await test.run(args, f)
 
         if args.dot is not None:
             await _compile_dots(dot_dir=args.dot, runner_config=args)
 
     async def run_tests(self, args) -> None:
+        test_file = TestFile(args.test_file)
+
+        log_path: pathlib.Path = TMPDIR / test_file.src_path.name
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
         try:
             # if `make run`
             # then just print summary table
             if args.command == "run":
+                log_path_prefix: pathlib.Path = TMPDIR / test_file.src_path.name
+
                 if args.dot and not args.dot.exists():
                     args.dot.mkdir(parents=True, exist_ok=True)
 
-                results = self._run(TestFile(args.test_file), args)
+                results = await self._run(test_file, args, log_path_prefix)
 
-                async for model, variants, test, result in results:
-                    # in the non-batch case, we just pipe isla-axiomatic output direct to user
-                    if args.batch:
-                        if variants:
-                            variants = ",".join(variants)
-                            print(f"{model}({variants})\t{test.name},{result.name}")
-                        else:
-                            print(f"{model}\t{test.name},{result.name}")
             # if nightly build then collect up results into tarball
             elif args.command == "nightly":
                 nightly_tmp_dirname = args.out
@@ -531,14 +501,16 @@ class Runner:
                     model_results_path = self._mk_model_results_filename(nightly_tmp, model_name, variants)
                     model_results_path.write_text("")
 
-                results = self._run(TestFile(args.test_file), args)
+                model_results_path = nightly_tmp / model_name
+                log_path_prefix: pathlib.Path = TMPDIR / test_file.src_path.name
+                results = await self._run(test_file, args, log_path_prefix)
 
-                async for model, variants, test, result in results:
-                    model_name = _model_name(model)
-                    model_results_path = self._mk_model_results_filename(nightly_tmp, model_name, variants)
-                    with open(model_results_path, "a", newline="") as f:
-                        writer = csv.writer(f)
-                        writer.writerow([f"{test.name}", f"{result.name}"])
+                # async for model, variants, result in results:
+                #     model_name = _model_name(model)
+                #     model_results_path = self._mk_model_results_filename(nightly_tmp, model_name, variants)
+                #     with open(model_results_path, "a", newline="") as f:
+                #         writer = csv.writer(f)
+                #         writer.writerow([f"{test.name}", f"{result.name}"])
 
                 _make_tarball(args, TMPDIR, nightly_tmp_dirname)
             elif args.command == "tar":
