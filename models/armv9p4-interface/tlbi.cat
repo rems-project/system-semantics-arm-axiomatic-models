@@ -29,33 +29,66 @@
 (* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.   *)
 (* ********************************************************************** *)
 
-# enum Regime = {Regime_EL3, Regime_EL30, Regime_EL2, Regime_EL20, Regime_EL10}
+(*
+struct TLBIInfo = {
+  rec: TLBIRecord,
+  shareability : Shareability,
+}
+
+enum TLBILevel = {TLBILevel_Any, TLBILevel_Last}
+
+enum TLBIOp = {
+  TLBIOp_DALL,
+  TLBIOp_DASID,
+  TLBIOp_DVA,
+  TLBIOp_IALL,
+  TLBIOp_IASID,
+  TLBIOp_IVA,
+  TLBIOp_ALL,
+  TLBIOp_ASID,
+  TLBIOp_IPAS2,
+  TLBIPOp_IPAS2,
+  TLBIOp_VAA,
+  TLBIOp_VA,
+  TLBIPOp_VAA,
+  TLBIPOp_VA,
+  TLBIOp_VMALL,
+  TLBIOp_VMALLS12,
+  TLBIOp_RIPAS2,
+  TLBIPOp_RIPAS2,
+  TLBIOp_RVAA,
+  TLBIOp_RVA,
+  TLBIPOp_RVAA,
+  TLBIPOp_RVA,
+  TLBIOp_RPA,
+  TLBIOp_PAALL
+}
+
+enum TLBIMemAttr = {TLBI_AllAttr, TLBI_ExcludeXS}
+
+struct TLBIRecord = {
+  op : TLBIOp,
+  from_aarch64 : bool,
+  security : SecurityState,
+  regime : Regime,
+  vmid : bits(16),
+  asid : bits(16),
+  level : TLBILevel,
+  attr : TLBIMemAttr,
+  ipaspace : PASpace,
+  address : bits(64),
+  end_address_name : bits(64),
+  d64 : bool,
+  d128 : bool,
+  ttl : bits(4),
+  tg : bits(2)
+}
+*)
 
 accessor tlbi_regime: Regime = .rec.regime
 
 define has_tlbi_regime(ev: Event, reg: Regime): bool =
     tlbi_regime(ev) == reg
-
-# enum TLBIOp = {
-#   TLBIOp_DALL,
-#   TLBIOp_DASID,
-#   TLBIOp_DVA,
-#   TLBIOp_IALL,
-#   TLBIOp_IASID,
-#   TLBIOp_IVA,
-#   TLBIOp_ALL,
-#   TLBIOp_ASID,
-#   TLBIOp_IPAS2,
-#   TLBIOp_VAA,
-#   TLBIOp_VA,
-#   TLBIOp_VMALL,
-#   TLBIOp_VMALLS12,
-#   TLBIOp_RIPAS2,
-#   TLBIOp_RVAA,
-#   TLBIOp_RVA,
-#   TLBIOp_RPA,
-#   TLBIOp_PAALL
-# }
 
 accessor tlbi_op: TLBIOp = .rec.op
 

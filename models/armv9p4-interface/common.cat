@@ -1,0 +1,7 @@
+include "armv9p4-interface/regs.cat"
+include "armv9p4-interface/addresses.cat"
+include "armv9p4-interface/barriers.cat"
+include "armv9p4-interface/cacheops.cat"
+include "armv9p4-interface/exceptions.cat"
+include "armv9p4-interface/wco.cat"
+include "armv9p4-interface/ifetch.cat"

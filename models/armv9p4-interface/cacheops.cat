@@ -1,43 +1,14 @@
-# enum CacheOp = {CacheOp_Clean, CacheOp_Invalidate, CacheOp_CleanInvalidate}
-# enum Shareability = {Shareability_NSH, Shareability_ISH, Shareability_OSH}
-
-# enum CacheOpScope = {
-#   CacheOpScope_SetWay,
-#   CacheOpScope_PoU,
-#   CacheOpScope_PoC,
-#   CacheOpScope_PoP,
-#   CacheOpScope_PoDP,
-#   CacheOpScope_ALLU,
-#   CacheOpScope_ALLUIS
-# }
-
-# enum CachePASpace = {
-#   CPAS_NonSecure,
-#   CPAS_Any,
-#   CPAS_RealmNonSecure,
-#   CPAS_Realm,
-#   CPAS_Root,
-#   CPAS_SecureNonSecure,
-#   CPAS_Secure
-# }
-
-# enum CacheType = {
-#   CacheType_Data,
-#   CacheType_Tag,
-#   CacheType_Data_Tag,
-#   CacheType_Instruction
-# }
-
-(*struct CacheRecord = {
-  acctype : AccType,
+(*
+struct CacheRecord = {
+  acctype : AccessType,
   cacheop : CacheOp,
   opscope : CacheOpScope,
   cachetype : CacheType,
   regval : bits(64),
   paddress : FullAddress,
   vaddress : bits(64),
-  set : int,
-  way : int,
+  setnum : int,
+  waynum : int,
   level : int,
   shareability : Shareability,
   translated : bool,
@@ -47,7 +18,29 @@
   asid : bits(16),
   security : SecurityState,
   cpas : CachePASpace
-}*)
+}
+
+enum CacheOp = {CacheOp_Clean, CacheOp_Invalidate, CacheOp_CleanInvalidate}
+
+enum CacheOpScope = {
+  CacheOpScope_SetWay,
+  CacheOpScope_PoU,
+  CacheOpScope_PoC,
+  CacheOpScope_PoE,
+  CacheOpScope_PoP,
+  CacheOpScope_PoDP,
+  CacheOpScope_PoPA,
+  CacheOpScope_ALLU,
+  CacheOpScope_ALLUIS
+}
+
+enum CacheType = {
+  CacheType_Data,
+  CacheType_Tag,
+  CacheType_Data_Tag,
+  CacheType_Instruction
+}
+*)
 
 accessor cache_op_kind: CacheOp = .cacheop
 accessor cache_op_type: CacheType = .cachetype
