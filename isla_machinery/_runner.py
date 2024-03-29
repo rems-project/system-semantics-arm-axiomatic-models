@@ -540,7 +540,7 @@ def _add_common_args(parser):
     # shared configuration
 
     # can pass --arch and --config instead to override default --arch-version
-    parser.add_argument("--arch-version", metavar="VERSION", default=None, help=f"architecture version to use (default: {DEFAULT_ISLA_VERSION})")
+    parser.add_argument("--arch-version", metavar="VERSION", default=None, choices=list(ISLA_CONFIG_VERSIONS), help=f"architecture version to use (default: {DEFAULT_ISLA_VERSION})")
     parser.add_argument("--arch", metavar="PATH", help=f"override architecture snapshot to pass to isla-axiomatic")
     parser.add_argument("--config", metavar="PATH", default=None, help=f"override config to pass to isla-axiomatic")
     parser.add_argument("--footprint-config", metavar="PATH", default=None, help=f"override config to pass to isla-axiomatic to use for footprint analysis")
