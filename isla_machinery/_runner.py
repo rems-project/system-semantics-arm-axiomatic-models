@@ -182,7 +182,9 @@ async def _run_isla(
         cmd.append(f"--ifetch")
 
     cmd.append(f"--isla-litmus={runner_config.isla_litmus}")
-    cmd.append(f"--litmus-translator={runner_config.litmus_translator}")
+
+    if not runner_config.no_litmus_translator:
+        cmd.append(f"--litmus-translator={runner_config.litmus_translator}")
 
     if opt:
         cmd.append(opt)
@@ -546,6 +548,7 @@ def _add_common_args(parser):
     parser.add_argument("--isla-axiomatic", metavar="PATH", default=DEFAULT_ISLA_AXIOMATIC_PATH, type=pathlib.Path, help=f"path to isla-axiomatic (default: {DEFAULT_ISLA_AXIOMATIC_PATH})")
     parser.add_argument("--isla-litmus", metavar="PATH", default=DEFAULT_ISLA_LITMUS, type=pathlib.Path, help=f"path to isla-litmus (default: {DEFAULT_ISLA_LITMUS})")
     parser.add_argument("--litmus-translator", metavar="PATH", default=DEFAULT_LITMUS_TRANSLATOR, type=pathlib.Path, help=f"path to litmus-translator (default: {DEFAULT_LITMUS_TRANSLATOR})")
+    parser.add_argument("--no-litmus-translator", default=False, action="store_true", help=f"use built-in isla-litmus translation")
 
     parser.add_argument("--ifetch", dest="mode", action="store_const", const=Mode.IFETCH, help="Run isla-axiomatic with ifetch mode enabled")
     parser.add_argument("--pgtable", dest="mode", action="store_const", const=Mode.PGTABLE, help="Run isla-axiomatic with translation table walks enabled")
