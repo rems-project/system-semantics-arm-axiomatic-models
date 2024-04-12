@@ -45,15 +45,13 @@ accessor Ifetch: bool = .access_kind.match {
     _ => false
 }
 
-accessor RelAcq: bool = .access_kind.strength.match {
-    AS_rel_or_acq => true,
-    _ => false
+accessor ak_strength: Access_strength = .access_kind.match {
+    AK_explicit => .strength,
+    _ => default
 }
 
-accessor AcqRCpc: bool = .access_kind.strength.match {
-    AS_acq_rcpc => true,
-    _ => false
-}
+define RelAcq(ev: Event): bool = (ak_strength(ev) == AS_rel_or_acq)
+define AcqRCpc(ev: Event): bool = (ak_strength(ev) == AS_acq_rcpc)
 
 define A(ev: Event): bool =
     R(ev) & Explicit(ev) & RelAcq(ev)
