@@ -112,14 +112,14 @@ accessor tlbi_address: bits(64) = .rec.address
 
 (* operation *)
 
-define TLBI-ASID(ev: Event): bool = 
+define TLBI-ASID(ev: Event): bool =
     TLBI(ev) & (
           has_tlbi_op(ev, TLBIOp_ASID)
         | has_tlbi_op(ev, TLBIOp_VA)
         | has_tlbi_op(ev, TLBIOp_VAA)
     )
 
-define TLBI-S1(ev: Event): bool = 
+define TLBI-S1(ev: Event): bool =
     TLBI(ev) & (
           has_tlbi_op(ev, TLBIOp_VA)
         | has_tlbi_op(ev, TLBIOp_VMALLS12)
@@ -128,7 +128,7 @@ define TLBI-S1(ev: Event): bool =
         | has_tlbi_op(ev, TLBIOp_ASID)
     )
 
-define TLBI-S2(ev: Event): bool = 
+define TLBI-S2(ev: Event): bool =
     TLBI(ev) & (
           has_tlbi_op(ev, TLBIOp_IPAS2)
         | has_tlbi_op(ev, TLBIOp_VMALLS12)
@@ -138,7 +138,7 @@ define TLBI-S2(ev: Event): bool =
     )
 
 
-define TLBI-VMID(ev: Event): bool = 
+define TLBI-VMID(ev: Event): bool =
     TLBI(ev) & (
           has_tlbi_op(ev, TLBIOp_VA)
         | has_tlbi_op(ev, TLBIOp_VAA)
@@ -148,18 +148,18 @@ define TLBI-VMID(ev: Event): bool =
         | has_tlbi_op(ev, TLBIOp_ASID)
     )
 
-define TLBI-VA(ev: Event): bool = 
+define TLBI-VA(ev: Event): bool =
     TLBI(ev) & has_tlbi_op(ev, TLBIOp_VA)
 
-define TLBI-IPA(ev: Event): bool = 
+define TLBI-IPA(ev: Event): bool =
     TLBI(ev) & has_tlbi_op(ev, TLBIOp_IPAS2)
 
 (* regime *)
 
-define TLBI-EL1(ev: Event): bool = 
+define TLBI-EL1(ev: Event): bool =
     TLBI(ev) & has_tlbi_regime(ev, Regime_EL10)
 
-define TLBI-EL2(ev: Event): bool = 
+define TLBI-EL2(ev: Event): bool =
     TLBI(ev) & has_tlbi_regime(ev, Regime_EL2)
 
 
@@ -168,30 +168,34 @@ define TLBI-EL2(ev: Event): bool =
 define TLBI-IS(ev: Event): bool =
     TLBI(ev) & (has_tlbi_shareability(ev, Shareability_ISH) | has_tlbi_shareability(ev, Shareability_OSH))
 
-(* read ASID/VMID from the register read *)
-
-set read_VMID
-set read_ASID
 relation same-translation
 
-(*let read_VMID = try read_VMID with emptyset
-let read_ASID = try read_ASID with emptyset
-let same-translation = try same-translation with emptyset*)
+accessor translation_vmid: bits(16) =
+    .translation_summary.match {
+        Some => .vmid.match {
+            Some => self,
+            _ => default
+        },
+        _ => default
+    }
 
-define tlbi-to-asid-read(ev1: Event, ev2: Event): bool =
-    TLBI-ASID(ev1) & AT(ev2) & read_ASID(ev2) & (tlbi_asid(ev1) == extract(63, 48, val_of_read_ASID(ev2)))
-
-define tlbi-to-vmid-read(ev1: Event, ev2: Event): bool =
-    TLBI-VMID(ev1) & AT(ev2) & read_VMID(ev2) & (tlbi_vmid(ev1) == extract(63, 48, val_of_read_VMID(ev2)))
-
-(* Currently we only use same-vmid/same-asid between TLBIs and
- * translates, so this relation defines them in a minimal way.
- *)
-let tlbi-translate-same-vmid = tlbi-to-vmid-read; [read_VMID]; same-translation
-let tlbi-translate-same-asid = tlbi-to-asid-read; [read_ASID]; same-translation
+accessor translation_asid: bits(16) =
+    .translation_summary.match {
+        Some => .asid.match {
+            Some => self,
+            _ => default
+        },
+        _ => default
+    }
 
 
-(* for TLBI by address 
+define tlbi-translate-same-vmid(ev1: Event, ev2: Event): bool =
+    TLBI-VMID(ev1) & AT(ev2) & (tlbi_vmid(ev1) == translation_vmid(ev2))
+
+define tlbi-translate-same-asid(ev1: Event, ev2: Event): bool =
+    TLBI-ASID(ev1) & AT(ev2) & (tlbi_asid(ev1) == translation_asid(ev2))
+
+(* for TLBI by address
  * this is not quite right... instead we should take note of what the level of the T is
  * and therefore what range it maps over, to determine if the TLBI affects it.
  * c.f. InvalidateWide
