@@ -74,18 +74,21 @@ ISLA_CONFIG_VERSIONS = {
     "arm9.3": DEFAULT_CONFIG_PATH / "armv9p3.toml",
     "arm9.3-mmu": DEFAULT_CONFIG_PATH / "armv9p3_mmu_on.toml",
     "arm9.4": DEFAULT_CONFIG_PATH / "armv9p4.toml",
+    "arm9.4-mmu": DEFAULT_CONFIG_PATH / "armv9p4_mmu_on.toml",
 }
 
 ISLA_FOOTPRINT_CONFIG_VERSIONS = {
     "arm9.3": DEFAULT_CONFIG_PATH / "armv9p3.toml",
     "arm9.3-mmu": DEFAULT_CONFIG_PATH / "armv9p3.toml",
     "arm9.4": DEFAULT_CONFIG_PATH / "armv9p4.toml",
+    "arm9.4-mmu": DEFAULT_CONFIG_PATH / "armv9p4.toml",
 }
 
 ISLA_SNAPSHOT_VERSIONS = {
     "arm9.3": DEFAULT_SNAPSHOTS_DIR / "armv9p3.ir",
     "arm9.3-mmu": DEFAULT_SNAPSHOTS_DIR / "armv9p3.ir",
     "arm9.4": DEFAULT_SNAPSHOTS_DIR / "armv9p4.ir",
+    "arm9.4-mmu": DEFAULT_SNAPSHOTS_DIR / "armv9p4.ir",
 }
 
 ISLA_DEBUG_PROBES = {
@@ -103,7 +106,15 @@ ISLA_DEBUG_PROBES = {
         "__DecodeExecute",
         "BranchTo",
         "AArch64_TakeException",
-    ]
+    ],
+    "arm9.4-mmu": [
+        "AArch64_TakeReset",
+        "__FetchInstr",
+        "__DecodeExecute",
+        "BranchTo",
+        "AArch64_TakeException",
+        "AArch64_TranslateAddress",
+    ],
 }
 
 DEFAULT_DOT_DIR = HERE / "dots"
