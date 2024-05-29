@@ -59,7 +59,8 @@ else:
 # +--+--isla/
 # +--system-semantics-arm-axiomatic-models/
 # +--+--models/
-DEFAULT_ISLA_AXIOMATIC_PATH = ISLA_DIR / "target" / "release" / "isla-axiomatic"
+DEFAULT_ISLA_AXIOMATIC_PATH_DEBUG = ISLA_DIR / "target" / "debug" / "isla-axiomatic"
+DEFAULT_ISLA_AXIOMATIC_PATH_RELEASE = ISLA_DIR / "target" / "release" / "isla-axiomatic"
 DEFAULT_SNAPSHOTS_DIR = REMS_DIR / "isla-snapshots"
 DEFAULT_CONFIG_PATH = ISLA_DIR / "configs"
 DEFAULT_MODEL = REMS_DIR / "system-semantics-arm-axiomatic-models" / "models" / "aarch64_base.cat"
@@ -68,7 +69,15 @@ DEFAULT_MODEL_IFETCH = REMS_DIR / "system-semantics-arm-axiomatic-models" / "mod
 DEFAULT_ISLA_LITMUS = ISLA_DIR / "isla-litmus" / "isla-litmus"
 DEFAULT_LITMUS_TRANSLATOR = HERDTOOLS_DIR / "_build" / "install" / "default" / "bin" / "litmus-translator"
 
-DEFAULT_ISLA_VERSION = "arm9.3"
+DEFAULT_ISLA_VERSION = "arm9.4"
+
+# pick the most recent of (debug, release)
+_isla_binaries = []
+if DEFAULT_ISLA_AXIOMATIC_PATH_DEBUG.exists():
+    _isla_binaries.append((DEFAULT_ISLA_AXIOMATIC_PATH_DEBUG.stat().st_mtime, DEFAULT_ISLA_AXIOMATIC_PATH_DEBUG))
+if DEFAULT_ISLA_AXIOMATIC_PATH_RELEASE.exists():
+    _isla_binaries.append((DEFAULT_ISLA_AXIOMATIC_PATH_RELEASE.stat().st_mtime, DEFAULT_ISLA_AXIOMATIC_PATH_RELEASE))
+DEFAULT_ISLA_AXIOMATIC_PATH = max(_isla_binaries)[1]
 
 ISLA_CONFIG_VERSIONS = {
     "arm9.3": DEFAULT_CONFIG_PATH / "armv9p3.toml",
@@ -85,10 +94,10 @@ ISLA_FOOTPRINT_CONFIG_VERSIONS = {
 }
 
 ISLA_SNAPSHOT_VERSIONS = {
-    "arm9.3": DEFAULT_SNAPSHOTS_DIR / "armv9p3.ir",
-    "arm9.3-mmu": DEFAULT_SNAPSHOTS_DIR / "armv9p3.ir",
-    "arm9.4": DEFAULT_SNAPSHOTS_DIR / "armv9p4.ir",
-    "arm9.4-mmu": DEFAULT_SNAPSHOTS_DIR / "armv9p4.ir",
+    "arm9.3": DEFAULT_SNAPSHOTS_DIR / "armv9p3",
+    "arm9.3-mmu": DEFAULT_SNAPSHOTS_DIR / "armv9p3",
+    "arm9.4": DEFAULT_SNAPSHOTS_DIR / "armv9p4",
+    "arm9.4-mmu": DEFAULT_SNAPSHOTS_DIR / "armv9p4",
 }
 
 ISLA_DEBUG_PROBES = {
@@ -99,6 +108,15 @@ ISLA_DEBUG_PROBES = {
         "AArch64_TakeException",
         "PC_read",
         "__ExecuteInstr",
+    ],
+    "arm9.3-mmu": [
+        "AArch64_TakeReset",
+        "__FetchNextInstr",
+        "BranchTo",
+        "AArch64_TakeException",
+        "PC_read",
+        "__ExecuteInstr",
+        "AArch64_TranslateAddress",
     ],
     "arm9.4": [
         "AArch64_TakeReset",
@@ -150,7 +168,7 @@ async def _run_isla(
     outf: io.TextIOBase,
     mode=DEFAULT_MODE,
     isla_path=DEFAULT_ISLA_AXIOMATIC_PATH,
-    arch=None,
+    arch:pathlib.Path = None,
     config=None,
     footprint_config=None,
     model=DEFAULT_MODEL,
@@ -179,6 +197,17 @@ async def _run_isla(
         ])
     else:
         cmd.append(f"{isla_path}")
+
+    assert arch is not None
+
+    # look for ARCH.ir or ARCH.irx, whichever is newer.
+    # TODO: check .irx magic header against isla version
+    if not arch.suffix:
+        found_archs = []
+        for suffix in [".irx", ".ir"]:
+            if arch.with_suffix(suffix).exists():
+                found_archs.append(arch.with_suffix(suffix))
+        arch = max(found_archs, key=lambda p: p.stat().st_mtime)
 
     cmd.extend([
         f"--arch={arch}",
@@ -354,35 +383,37 @@ class TestFile:
             )
 
         # now try attach any debugging args
+        probes = list(config.probes)
+        debug_args = list(config.debug_args)
+
         if config.verbose >= 3:
             # linearize output
             extra.extend(["-T", "1"])
+
             # debugging symbolic evaluation
-            debug_args = "lp"
+            debug_args.extend("lp")
             if config.verbose >= 4:
-                debug_args += "m"
-
-            debug_args += "".join(config.debug_args)
-
-            extra.extend(["-D", debug_args])
-            probes = []
+                debug_args.append("m")
 
             if config.arch_version is not None:
                 probes.extend(ISLA_DEBUG_PROBES[config.arch_version])
 
-            probes.extend(config.probes)
-
-            for p in probes:
-                extra.extend(["--probe", p])
-
             if config.verbose >= 4:
-                extra.extend(["--probe", "AArch64_TranslateAddress"])
-                extra.extend(["--probe", "AArch64_S1Translate"])
-                extra.extend(["--probe", "AArch64_S2Translate"])
+                probes.extend(["AArch64_TranslateAddress"])
 
             # for debugging the model
             extra.extend(["--graph-show-all-reads"])
             extra.extend(["--graph-shows=po,rf,co,rfi,trf,tfr,fr,bob,ctxob,dob,iio,tob,addr,data,ctrl"])
+
+        if debug_args:
+            if probes:
+                debug_args.append("p")
+
+            debug_args = "".join(config.debug_args)
+            extra.extend(["-D", debug_args])
+
+            for p in probes:
+                extra.extend(["--probe", p])
 
         # run again to get the actual results
         res = await _run_isla(
