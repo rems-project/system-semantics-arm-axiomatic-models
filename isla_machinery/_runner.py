@@ -409,7 +409,7 @@ class TestFile:
             if probes:
                 debug_args.append("p")
 
-            debug_args = "".join(config.debug_args)
+            debug_args = "".join(debug_args)
             extra.extend(["-D", debug_args])
 
             for p in probes:
