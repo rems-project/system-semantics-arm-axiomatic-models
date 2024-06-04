@@ -251,9 +251,17 @@ async def _run_isla(
         variants = ",".join(variants)
         cmd.append(f"--variant={variants}")
 
-    # for performance
+    # for performance, we give a tactic to z3 that we know performs well over the kinds of smt problems we generate
+    # the set and sequence is guided by some domain knowledge, and a healthy amount of trial-and-error, but roughly we:
+    # - define many relations in the form `assert forall x. f x = defn` so we apply `injectivity` to make sure they're all marked.
+    # - we have mixed bitvector and datatype problems, so convert as much as possible into pure bitvectors.
+    # - we distribute the foralls over conjunctions, this seems to help a lot.
+    # - we generate a lot of pre-defined relations as chains of if-then-else, but whose constraints are on ground terms (usually read/write values),
+    #   so we hoist those up as far as possible.
+    # then we simplify, remove as many quantifiers as z3 can, and use those ground terms of solve any equations. This seems to help,
+    # before applying the bitvector solver.
     cmd.append("--check-sat-using")
-    cmd.append("(then dt2bv qe simplify solve-eqs bv)")
+    cmd.append("(then injectivity dt2bv eq2bv simplify distribute-forall cofactor-term-ite ctx-simplify qe solve-eqs bv)")
 
     # now give it the actual test path
 
