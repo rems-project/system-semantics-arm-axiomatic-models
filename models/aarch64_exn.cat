@@ -22,6 +22,9 @@ let CSE =
   | if "FEAT_ExS" & ~"EIS" then empty else TE
   | if "FEAT_ExS" & ~"EOS" then empty else ERET
 
+let ASYNC =
+  TakeInterrupt  (* where TakeInterrupt = the TE but from an injected interrupt event *)
+
 (* observed by *)
 let obs = rfe | fr | co
 
@@ -54,8 +57,12 @@ let ctxob =
   | [MSR]; po; [CSE]
   | speculative; [CSE]
 
+let asyncob =
+    speculative; [ASYNC]
+  | [ASYNC]; po
+
 (* Ordered-before *)
-let ob1 = obs | dob | aob | bob | ctxob
+let ob1 = obs | dob | aob | bob | ctxob | asyncob
 let ob = ob1^+
 
 (* Internal visibility requirement *)
