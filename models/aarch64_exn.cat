@@ -13,14 +13,14 @@ variant SEA_R SEA_W
 let speculative =
     ctrl
   | addr; po
-  | if "SEA_R" then [R]; po else empty
-  | if "SEA_W" then [W]; po else empty
+  | if SEA_R then [R]; po else {}
+  | if SEA_W then [W]; po else {}
 
 (* context-sync-events *)
-let CSE =
-  ISB
-  | if "FEAT_ExS" & ~"EIS" then empty else TE
-  | if "FEAT_ExS" & ~"EOS" then empty else ERET
+define CSE(ev: Event): bool =
+  ISB(ev)
+  | if FEAT_ExS then (if EIS then false else TE(ev)) else TE(ev)
+  | if FEAT_ExS then (if EOS then false else ERET(ev)) else ERET(ev)
 
 let ASYNC =
   TakeInterrupt  (* where TakeInterrupt = the TE but from an injected interrupt event *)
